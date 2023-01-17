@@ -36,7 +36,7 @@ def generate_act_format(opcodes_file):
   opcode_mapping = dict()
 
   for line in opcodes_file.readlines():
-    match_groups = re.findall(r'^\s*([^\/].*)= (.*),\s*\/\/.*$', line)
+    match_groups = re.findall(r'^\s*([^\/].*)=\s*(.*),\s*\/\/.*$', line)
     if len(match_groups) != 1:
       continue
 
