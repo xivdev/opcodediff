@@ -7,8 +7,29 @@ ZONE_PROTO_DOWN_SIG = "48 89 ? 24 ? ? 48 83 EC 50 8B F2 49 8B"
 fucked_distance = 0xffffffff
 max_size_diff = 10
 
-def get_longest_switch(switch_cases_json):
-  switch_cases = json.loads(switch_cases_json)
+def get_opcode_offset(r2):
+  orig_loc = r2.cmd("s") # Save original spot
+  r2.cmd("aei") # Initialize ESIL VM
+  r2.cmd("aeim") # Initialize ESIL VM stack
+  r2.cmd("aeip") # Initialize ESIL VM IP to curseek
+
+  r2.cmd("aecc") # continue until call
+  r2.cmd('"aesue rax,0x0,>"') # continue until rax changes?
+  r2.cmd("aer rdx=0x200") # set rdx to some arbitrary number
+  r2.cmd("aeso") # step
+
+  regs = r2.cmdj("arj")
+  opcode_offset = regs["rdx"] - regs["rax"]
+
+  # Clear the ESIL environment
+  r2.cmd('ar0')
+  r2.cmd('aeim-')
+  r2.cmd('aei-')
+  r2.cmd(f"s {orig_loc}") # Seek back to original spot
+
+  return opcode_offset
+
+def get_longest_switch(switch_cases):
   switches = dict()
 
   pattern = re.compile("case\.(0x[0-9a-fA-F]+)\.(\d+)")
@@ -34,8 +55,7 @@ def get_longest_switch(switch_cases_json):
 
   return longest_switch
 
-def get_block_sizes(blocks_json):
-  blocks = json.loads(blocks_json)
+def get_block_sizes(blocks):
   block_sizes = dict()
   for block in blocks:
     block_sizes[block["addr"]] = block["size"]
@@ -58,7 +78,6 @@ def get_opcodes_db(exe_file):
   from utils import eprint, create_r2_byte_pattern, sync_r2_output
 
   import r2pipe
-  import time
 
   r2 = r2pipe.open(exe_file, ["-2"])
   eprint(f"Radare loaded {exe_file}")
@@ -74,42 +93,25 @@ def get_opcodes_db(exe_file):
   ## STEP 1: Grab switch cases
   r2.cmd("f--") # Delete existing flags
   r2.cmd("afr") # Analyze function recursively
-  switch_cases_json = r2.cmd(f"fj")
+  switch_cases = r2.cmdj(f"fj")
 
   eprint(f"  Loaded switch cases")
 
   ## STEP 2: Grab opcode offset
-  r2.cmd("aei") # Initialize ESIL VM
-  r2.cmd("aeim") # Initialize ESIL VM stack
-  r2.cmd("aeip") # Initialize ESIL VM IP to curseek
 
-  r2.cmd("aecc") # continue until call
-  r2.cmd('"aesue rax,0x0,>"') # continue until rax changes?
-  r2.cmd("aer rdx=0x200") # set rdx to some arbitrary number
-  r2.cmd("aeso") # step
-
-  regs = r2.cmd("arj")
-  regs = json.loads(regs)
-  opcode_offset = regs["rdx"] - regs["rax"]
-
-  # Clear the ESIL environment
-  r2.cmd('ar0')
-  r2.cmd('aeim-')
-  r2.cmd('aei-')
-  r2.cmd(f"s {target}") # Seek back to packet handler ea
-
+  opcode_offset = get_opcode_offset(r2)
   eprint(f"  Found opcode offset: {opcode_offset}")
 
   ## STEP 3: Grab blocks from packet handler
-  blocks_json = r2.cmd("afbj")
+  blocks = r2.cmdj("afbj")
 
   r2.quit()
 
   eprint(f"  Grabbed blocks from packet handler")
 
   ## STEP 4: Process data
-  packet_handler_switch = get_longest_switch(switch_cases_json)
-  block_sizes = get_block_sizes(blocks_json)
+  packet_handler_switch = get_longest_switch(switch_cases)
+  block_sizes = get_block_sizes(blocks)
   opcode_db = generate_opcode_db(packet_handler_ea, packet_handler_switch, opcode_offset, block_sizes)
 
   eprint(f"  Loaded {len(opcode_db)} cases from packet handler")
