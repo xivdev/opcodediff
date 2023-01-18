@@ -65,7 +65,7 @@ def get_block_sizes(blocks):
     return block_sizes
 
 
-def generate_opcode_db(packet_handler_ea, switch, opcode_offset, block_sizes):
+def generate_opcodes_db(packet_handler_ea, switch, opcode_offset, block_sizes):
     opcodes_db = dict()
 
     for case_ea, data in switch.items():
@@ -79,7 +79,7 @@ def generate_opcode_db(packet_handler_ea, switch, opcode_offset, block_sizes):
     return opcodes_db
 
 
-def get_opcodes_db(exe_file):
+def extract_opcode_data(exe_file):
     from utils import eprint, create_r2_byte_pattern, sync_r2_output
 
     import r2pipe
@@ -117,13 +117,13 @@ def get_opcodes_db(exe_file):
     ## STEP 4: Process data
     packet_handler_switch = get_longest_switch(switch_cases)
     block_sizes = get_block_sizes(blocks)
-    opcode_db = generate_opcode_db(
+    opcodes_db = generate_opcodes_db(
         packet_handler_ea, packet_handler_switch, opcode_offset, block_sizes
     )
 
-    eprint(f"  Loaded {len(opcode_db)} cases from packet handler")
+    eprint(f"  Loaded {len(opcodes_db)} cases from packet handler")
 
-    return opcode_db
+    return opcodes_db
 
 
 def find_closest_rel_ea(opcodes_db, dest):
@@ -190,8 +190,8 @@ def find_opcode_matches(old_opcodes_db, new_opcodes_db):
     "new_exe", type=click.Path(exists=True, dir_okay=False, resolve_path=True)
 )
 def minor_patch_diff(old_exe, new_exe):
-    old_opcodes_db = get_opcodes_db(old_exe)
-    new_opcodes_db = get_opcodes_db(new_exe)
+    old_opcodes_db = extract_opcode_data(old_exe)
+    new_opcodes_db = extract_opcode_data(new_exe)
 
     opcodes_found = find_opcode_matches(old_opcodes_db, new_opcodes_db)
     opcodes_object = []
