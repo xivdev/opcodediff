@@ -26,10 +26,15 @@ def sync_r2_output(r2):
 
     Read stuff from the process pipe until it stops being stupid.
     """
+
+    def set_blocking(fileno, blocking):
+        if hasattr(os, "set_blocking"):
+            os.set_blocking(fileno, blocking)
+
     time.sleep(1)
-    os.set_blocking(r2.process.stdout.fileno(), False)
+    set_blocking(r2.process.stdout.fileno(), False)
     p = r2.process.stdout.read(1)
-    os.set_blocking(r2.process.stdout.fileno(), True)
+    set_blocking(r2.process.stdout.fileno(), True)
     output = r2.cmd(f"?vi 123").strip()
     if output != "123":
         raise Exception("R2 state never got synced")

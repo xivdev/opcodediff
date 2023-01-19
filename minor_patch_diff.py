@@ -216,9 +216,7 @@ def minor_patch_diff(old_exe, new_exe):
     opcodes_found = find_opcode_matches(old_opcodes_db, new_opcodes_db)
     opcodes_object = []
 
-    for k, v in enumerate(opcodes_found):
-        old, new = v
-
+    for (old, new) in opcodes_found:
         opcodes_object.append(
             {
                 "old": [hex(o) for o in old],
