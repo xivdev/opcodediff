@@ -10,6 +10,7 @@ python-Levenshtein==0.20.9
 r2pipe==1.7.4
 rapidfuzz==2.13.7
 tomli==2.0.1
+-f https://download.pytorch.org/whl/torch_stable.html
 torch==1.13.1+cu117
 tqdm==4.64.1
 typing_extensions==4.4.0
