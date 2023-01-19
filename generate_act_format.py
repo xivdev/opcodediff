@@ -34,6 +34,16 @@ desired_names = {
 @click.command()
 @click.argument("opcodes_file", type=click.File("r"))
 def generate_act_format(opcodes_file):
+    """
+    Parses an OPCODES_FILE and outputs opcodes in a format expected by ACT.
+    This is also just a bunch of regexes slapped together.
+
+    Outputs to stdout.
+
+    Example:
+
+    python generate_act_format.py Ipcs.h
+    """
     opcode_mapping = dict()
 
     for line in opcodes_file.readlines():

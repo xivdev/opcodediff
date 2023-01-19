@@ -190,6 +190,26 @@ def find_opcode_matches(old_opcodes_db, new_opcodes_db):
     "new_exe", type=click.Path(exists=True, dir_okay=False, resolve_path=True)
 )
 def minor_patch_diff(old_exe, new_exe):
+    """
+    Generates an opcode diff file for minor patches (e.g 6.30 => 6.30h).
+
+    This script outputs to stdout, so pipe it to a json file.
+
+    The format of the output is a list (all fields are optional):
+
+    \b
+    [
+        {
+            "old": (list of opcodes in the switch case),
+            "new": (list of opcodes in the switch case),
+        },
+        ...
+    ]
+
+    Example:
+
+    python minor_patch_diff.py ffxiv_dx11.old.exe ffxiv_dx11.new.exe > diff.json
+    """
     old_opcodes_db = extract_opcode_data(old_exe)
     new_opcodes_db = extract_opcode_data(new_exe)
 

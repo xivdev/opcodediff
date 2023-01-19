@@ -49,8 +49,20 @@ def replace_line_with_new_opcode(line, diff, ver):
 @click.argument("new_version_string")
 @click.argument("diff_file", type=click.File("r"))
 @click.argument("opcodes_file", type=click.File("r"))
-@click.option("--reverse", is_flag=True)
+@click.option(
+    "--reverse", is_flag=True, help="Applies the diff file in the opposite direction"
+)
 def generate_opcodes_file(new_version_string, diff_file, opcodes_file, reverse):
+    """
+    Parses an OPCODES_FILE and applies a JSON DIFF_FILE to generate a new one.
+    The opcodes file is basically anything that has syntax resembling Sapphire's
+    `Ipcs.h`. It doesn't do any C++ header parsing; it's just a bunch of regexes
+    slapped together but it works.
+
+    Example:
+
+    python generate_opcodes_file.py 6.30h diff.json Ipcs.h
+    """
     diff = load_diff_file(diff_file, reverse)
     queued_lines = []
     for line in opcodes_file.readlines():

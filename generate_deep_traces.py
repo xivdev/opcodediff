@@ -209,6 +209,20 @@ def trace_lines(blocks, ref):
 )
 @click.argument("output_dir", type=click.Path(file_okay=False))
 def generate_deep_traces(exe_file, output_dir):
+    """
+    Generates deep traces for every packet handler in the target EXE_FILE.
+    This outputs an ASM trace as an .asm file for each pointer opcode.
+    It also outputs an `opcode_sets.json` that maps each pointer opcode to the
+    full set of opcodes handled by that trace.
+
+    These aren't normal traces by any measure; they are simply basic blocks
+    printed in BFS order, where children blocks are added to the BFS tree
+    by traversing calls and jumps.
+
+    Example:
+
+    python generate_deep_traces.py ffxiv_dx11.6.28h.exe 6.28h-traces
+    """
     opcodes_db, blocks = extract_opcode_data(exe_file)
 
     pathlib.Path(output_dir).mkdir(parents=True, exist_ok=True)
