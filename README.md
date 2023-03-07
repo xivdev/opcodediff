@@ -44,13 +44,12 @@ Pass `--help` to any of the scripts for usage.
 
 Example:
 ```sh
-python minor_patch_diff.py ffxiv_dx11.6.30.exe ffxiv_dx11.6.30h.exe > 6.30h.diff.json
+python vtable_diff.py ffxiv_dx11.6.30.exe ffxiv_dx11.6.30h.exe > 6.30h.diff.json
 ```
 
 Post-diff processing:
 ```sh
-python generate_opcodes_file.py 6.30h 6.30h.diff.json Ipcs.6.30h.h
-# TODO: Need a script to resolve opcodes for handlers with multiple opcodes
+python generate_opcodes_file.py 6.30 6.30h 6.30h.diff.json Ipcs.6.30h.h
 python generate_act_format.py Ipcs.6.30h.h
 ```
 
@@ -67,7 +66,7 @@ python traces_diff.py 6.28h-traces 6.30-traces 6.30.diff.json
 
 Post-diff processing:
 ```sh
-python generate_opcodes_file.py 6.30h 6.30h.diff.json Ipcs.6.30h.h
+python generate_opcodes_file.py 6.30 6.30h 6.30h.diff.json Ipcs.6.30h.h
 # TODO: Need a script to resolve opcodes for handlers with multiple opcodes
 python generate_act_format.py Ipcs.6.30h.h
 ```
