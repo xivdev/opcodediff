@@ -31,9 +31,9 @@ binary.
    ```
 
 1. Ensure you have [radare](https://github.com/radareorg/radare2) somewhere on
-    your path
+    your PATH
 
-1. For `traces-diff.py`, an NVIDIA GPU and CUDA support are highly recommended,
+1. For `generate_similarity_matrix.py`, an NVIDIA GPU and CUDA support are highly recommended,
    but not required. It might just take twice as long to train.
 
 ## Usage
@@ -53,6 +53,12 @@ python generate_opcodes_file.py 6.30 6.30h 6.30h.diff.json Ipcs.6.30h.h
 python generate_act_format.py Ipcs.6.30h.h
 ```
 
+Sanity checking with the older method as validation:
+```sh
+python minor_patch_diff.py ffxiv_dx11.6.30.exe ffxiv_dx11.6.30h.exe > 6.30h.sanity.json
+python sanity_check.py 6.30h.diff.json 6.30h.sanity.json
+```
+
 ### Workflow for major patches
 
 We'll need to generate "traces" as signatures for every packet handler.
@@ -61,14 +67,13 @@ Example:
 ```sh
 python generate_deep_traces.py ffxiv_dx11.6.28h.exe 6.28h-traces
 python generate_deep_traces.py ffxiv_dx11.6.30.exe 6.30-traces
-python traces_diff.py 6.28h-traces 6.30-traces 6.30.diff.json
+python generate_similarity_matrix.py 6.28h-traces 6.30-traces 6.30.similarity.json
+
+python vtable_alignment.py ffxiv_dx11.6.28h.exe ffxiv_dx11.6.30.exe 6.30.similarity.json > 6.30.diff.json
 ```
 
-Post-diff processing:
+### Post-diff processing
 ```sh
 python generate_opcodes_file.py 6.30 6.30h 6.30h.diff.json Ipcs.6.30h.h
-# TODO: Need a script to resolve opcodes for handlers with multiple opcodes
 python generate_act_format.py Ipcs.6.30h.h
 ```
-
-###
