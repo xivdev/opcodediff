@@ -31,15 +31,23 @@ def sanity_check(vtable_diff, minor_patch_diff):
     diff1 = load_diff_file(vtable_diff)
     diff2 = load_diff_file(minor_patch_diff)
 
-    for (old_opcode, new_opcodes) in diff2.items():
+    all_good = True
+    for old_opcode, new_opcodes in diff2.items():
         if old_opcode not in diff1:
             if len(new_opcodes) < 50:
                 print(f"Missing old opcode in vtable diff: {old_opcode}")
+                all_good = False
             continue
 
         other_new_opcodes = diff1[old_opcode]
         if list(other_new_opcodes)[0] not in new_opcodes:
             print(f"vtable diff mismatch for case {old_opcode} => {other_new_opcodes}")
+            all_good = False
+
+    if all_good:
+        print("Sanity check OK")
+    else:
+        print("Errors detected")
 
 
 if __name__ == "__main__":
