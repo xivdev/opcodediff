@@ -42,6 +42,9 @@ Pass `--help` to any of the scripts for usage.
 
 ### Workflow for minor patches
 
+Here we simply match the vtable from the previous version to the new minor patch version,
+assuming there is a 1:1 correspondence between the switch cases at the same offset in the function.
+
 Example:
 ```sh
 python vtable_diff.py ffxiv_dx11.6.30.exe ffxiv_dx11.6.30h.exe > 6.30h.diff.json
@@ -61,7 +64,19 @@ python sanity_check.py 6.30h.diff.json 6.30h.sanity.json
 
 ### Workflow for major patches
 
-We'll need to generate "traces" as signatures for every packet handler.
+For major patches, we cannot assume a 1:1 correspondence between vtables as before, since there
+are probably insertions in the new version that are scattered throughout the switch case.
+
+To solve this, we can run a sequence alignment algorithm to match the two vtables.
+
+But first, in order to generate a similarity matrix, we must first generate
+"traces" as signatures for every packet handler.  Then we can plug these traces
+into our language model to generate embeddings for each handler. Then, we can
+simply run cross cosine similarity to match these embeddings to generate our
+similarity matrix.
+
+Finally, we run the [Needleman-Wunsch algorithm](https://en.wikipedia.org/wiki/Needleman%E2%80%93Wunsch_algorithm)
+to generate a global sequence alignment of the two vtables.
 
 Example:
 ```sh
