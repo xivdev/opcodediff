@@ -2,10 +2,17 @@ import click
 import json
 import re
 
-ZONE_PROTO_DOWN_SIG = "48 89 ? 24 ? ? 48 83 EC 50 8B F2 49 8B"
-
 fucked_distance = 0xFFFFFFFF
 max_size_diff = 10
+
+
+def get_zone_proto_down_sig(exe_file: str):
+    res = re.match(".*ffxiv_dx11\.(.*)\.exe", exe_file)
+    ver = res.group(1)
+    if ver == "6.40":
+        return "40 53 56 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 44 24 ? 8B F2"
+    else:
+        return "48 89 ? 24 ? ? 48 83 EC 50 8B F2 49 8B"
 
 
 def get_opcode_offset(r2):
@@ -15,6 +22,7 @@ def get_opcode_offset(r2):
     r2.cmd("aeip")  # Initialize ESIL VM IP to curseek
 
     r2.cmd("aecc")  # continue until call
+    r2.cmd("aer rax=0x0")  # set rax to 0
     r2.cmd('"aesue rax,0x0,>"')  # continue until rax changes?
     r2.cmd("aer rdx=0x200")  # set rdx to some arbitrary number
     r2.cmd("aeso")  # step
@@ -89,7 +97,7 @@ def extract_opcode_data(exe_file):
 
     sync_r2_output(r2)
 
-    p = create_r2_byte_pattern(ZONE_PROTO_DOWN_SIG)
+    p = create_r2_byte_pattern(get_zone_proto_down_sig(exe_file))
     target = r2.cmd(f"/x {p}").split()[0]  # Find byte pattern
     packet_handler_ea = int(target, 16)
 
@@ -216,7 +224,7 @@ def minor_patch_diff(old_exe, new_exe):
     opcodes_found = find_opcode_matches(old_opcodes_db, new_opcodes_db)
     opcodes_object = []
 
-    for (old, new) in opcodes_found:
+    for old, new in opcodes_found:
         opcodes_object.append(
             {
                 "old": [hex(o) for o in old],

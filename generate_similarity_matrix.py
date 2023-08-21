@@ -2,14 +2,14 @@ import click
 import torch
 from asm2vec.utils import (
     TraceData,
-    AsmDataset,
-    preprocess,
     train,
     save_model,
     cosine_similarities,
 )
 from asm2vec.datatype import Tokens
 import json
+
+import Levenshtein as lev
 
 
 def length_heuristic(l0, l1, debug=False):
@@ -53,13 +53,27 @@ def full_similarity_matrix(
             l0 = len(old_fns[old_idx].insts)
             l1 = len(new_fns[new_idx].insts)
             length_factor = length_heuristic(l0, l1)
+
+            h0 = old_data["packet_size_hint"]
+            h1 = new_data["packet_size_hint"]
+
+            packet_size_factor = 0
+            if h0 == h1 and h0 != 0:
+                packet_size_factor = 0.5
+            else:
+                packet_size_factor = -0.5
             # Since cosine similarity is in the range (-1, 1), add 1 to push it
             # into the range (0, 2).
             cs = cosine_similarity_matrix[old_idx, new_idx] + 1
 
-            # Multiply all these factors together to yield some value in the range
-            # (0, 2), then subtract 1 to get a score from range (-1, 1)
+            # Multiply the length factor and cosine similarity together to
+            # yield some value in the range (0, 2), then subtract 1 to get a
+            # score from range (-1, 1)
             score = length_factor * cs - 1
+
+            # Add or subtract score depending on the packet size matching
+            # Also clamp value to between (-1, 1)
+            score = max(min(score + packet_size_factor, 1.0), -1.0)
 
             # Now we copy this similarity value for all opcodes in the new
             # switch case

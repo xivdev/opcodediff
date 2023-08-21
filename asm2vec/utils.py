@@ -10,6 +10,7 @@ import re
 import json
 
 CONSTANTS_RE = re.compile(r"(-? 0x[0-9a-f]+)|\*([0-9])| ([0-9])")
+PACKET_SIZE_HINT_RE = re.compile(r"mov qword \[rsp \+ 0x20\], (0x[0-9a-f]+)")
 
 
 class TraceData:
@@ -84,6 +85,7 @@ class TraceData:
         self.opcodes[ptr_opcode] = {
             "fn_idx": fn_idx,
             "constants_vector": self.__get_constants_vector(text),
+            "packet_size_hint": self.__get_packet_size_hint(text),
             "opcodes": self.__opcode_sets[ptr_opcode],
         }
 
@@ -118,6 +120,37 @@ class TraceData:
             if abs(const) < 10000:
                 constants.append(const)
         return constants
+
+    @staticmethod
+    def __get_packet_size_hint(trace):
+        """
+        Dumb way of getting the packet size hint from whatever handlers
+        call them
+        """
+        call0_lines = []
+        call0_found = False
+
+        for line in trace.strip("\n").split("\n"):
+            if not call0_found:
+                if "CALL0" in line:
+                    call0_found = True
+                else:
+                    continue
+            if "CALL0_END" in line:
+                break
+            else:
+                call0_lines.append(line)
+
+        for line in call0_lines:
+            match = PACKET_SIZE_HINT_RE.search(line)
+            if match and match.lastindex:
+                const_str = match.group(match.lastindex)
+                const_str = "".join(const_str.split())
+                const = int(const_str, 16)
+                return const
+
+        # Couldn't find anything, so just return 0
+        return 0
 
     @staticmethod
     def load_data(paths, tokens):

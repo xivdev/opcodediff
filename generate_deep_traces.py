@@ -2,7 +2,11 @@ import click
 import json
 import pathlib
 
-from minor_patch_diff import get_opcode_offset, get_longest_switch, ZONE_PROTO_DOWN_SIG
+from minor_patch_diff import (
+    get_opcode_offset,
+    get_longest_switch,
+    get_zone_proto_down_sig,
+)
 
 
 class RefNode:
@@ -138,7 +142,7 @@ def extract_opcode_data(exe_file):
 
     sync_r2_output(r2)
 
-    p = create_r2_byte_pattern(ZONE_PROTO_DOWN_SIG)
+    p = create_r2_byte_pattern(get_zone_proto_down_sig(exe_file))
     target = r2.cmd(f"/x {p}").split()[0]  # Find byte pattern
     packet_handler_ea = int(target, 16)
 

@@ -53,7 +53,9 @@ def generate_act_format(opcodes_file):
 
         opcode_name = match_groups[0][0].strip()
         opcode_val = match_groups[0][1]
-        if " or " in opcode_val:
+        if opcode_val == "UNKNOWN":
+            opcodes = []
+        elif " or " in opcode_val:
             opcodes = [int(v, 16) for v in opcode_val.split(" or ")]
         else:
             opcodes = [int(opcode_val, 16)]
@@ -67,6 +69,8 @@ def generate_act_format(opcodes_file):
             print(f"{desired}|{opcodes[0]:x}")
         elif len(opcodes) > 1:
             print(f'{desired}|{[f"{opcode:x}" for opcode in opcodes]}')
+        else:
+            print(f"{desired}|???")
 
 
 if __name__ == "__main__":

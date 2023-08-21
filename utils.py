@@ -1,6 +1,7 @@
 import sys
 import time
 import os
+import click
 
 
 def eprint(*args, **kwargs):
@@ -38,3 +39,18 @@ def sync_r2_output(r2):
     output = r2.cmd(f"?vi 123").strip()
     if output != "123":
         raise Exception("R2 state never got synced")
+
+
+class HexIntParamType(click.ParamType):
+    name = "integer"
+
+    def convert(self, value, param, ctx):
+        if isinstance(value, int):
+            return value
+
+        try:
+            if value[:2].lower() == "0x":
+                return int(value[2:], 16)
+            return int(value, 16)
+        except ValueError:
+            self.fail(f"{value!r} is not a valid hex integer", param, ctx)

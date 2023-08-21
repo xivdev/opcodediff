@@ -24,6 +24,7 @@ def needleman_wunsch(old_seq, new_seq, similarity, gap_penalty):
         mat[i][0] = gap_penalty * i
     for i in range(1, n + 1):
         for j in range(1, m + 1):
+            # max(Match, Insertion, Deletion)
             mat[i][j] = max(
                 mat[i - 1][j - 1] + similarity.lookup(old_seq[i - 1], new_seq[j - 1]),
                 mat[i][j - 1] + gap_penalty,
@@ -74,22 +75,27 @@ class Similarity:
         self.new_opcodes = {
             opcode: idx for (idx, opcode) in enumerate(data["new_opcodes"])
         }
-        self.__matrix = data["matrix"]
+        self.matrix = data["matrix"]
+        self.warnings = set()
 
     def lookup(self, old_opcode, new_opcode):
         if old_opcode not in self.old_opcodes:
-            eprint(
+            self.warnings.add(
                 f"WARNING: Could not find old opcode {hex(old_opcode)} in similarity matrix"
             )
             return 0
         if new_opcode not in self.new_opcodes:
-            eprint(
+            self.warnings.add(
                 f"WARNING: Could not find new opcode {hex(new_opcode)} in similarity matrix"
             )
             return 0
         i = self.old_opcodes[old_opcode]
         j = self.new_opcodes[new_opcode]
-        return self.__matrix[i][j]
+        return self.matrix[i][j]
+
+    def print_warnings(self):
+        for warning in self.warnings:
+            eprint(warning)
 
 
 @click.command()
@@ -137,6 +143,8 @@ def vtable_alignment(old_exe, new_exe, similarity_json_file):
 
     similarity = Similarity(similarity_json_file)
     alignment, score = needleman_wunsch(old_seq, new_seq, similarity, -1)
+
+    similarity.print_warnings()
     eprint(f"Alignment score: {score}")
 
     diff = []
