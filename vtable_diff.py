@@ -28,7 +28,6 @@ def get_opcode_offset(r2):
 
 
 def extract_opcode_data(exe_file):
-
     r2 = r2pipe.open(exe_file, ["-2"])
     eprint(f"Radare loaded {exe_file}")
 
@@ -72,7 +71,7 @@ def extract_opcode_data(exe_file):
 def find_opcode_matches(old_opcodes_db, new_opcodes_db):
     matches = []
 
-    for (offset, old_opcode) in old_opcodes_db.items():
+    for offset, old_opcode in old_opcodes_db.items():
         if offset in new_opcodes_db:
             matches.append((old_opcode, new_opcodes_db[offset]))
 
@@ -110,10 +109,15 @@ def vtable_diff(old_exe, new_exe):
     old_opcodes_db = extract_opcode_data(old_exe)
     new_opcodes_db = extract_opcode_data(new_exe)
 
+    if len(old_opcodes_db) != len(new_opcodes_db):
+        eprint(
+            f"WARNING: vtables have different sizes: {len(old_opcodes_db)} != {len(new_opcodes_db)}. Matches may not be correct."
+        )
+
     opcodes_found = find_opcode_matches(old_opcodes_db, new_opcodes_db)
     opcodes_object = []
 
-    for (old, new) in opcodes_found:
+    for old, new in opcodes_found:
         opcodes_object.append(
             {
                 "old": [hex(old)],
