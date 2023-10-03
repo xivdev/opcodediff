@@ -10,7 +10,12 @@ from utils import HexIntParamType
     type=click.Path(exists=True, dir_okay=False, resolve_path=True),
 )
 @click.argument("opcode", type=HexIntParamType())
-def debug_similarity_matrix(similarity_json_file, opcode):
+@click.option(
+    "--reverse",
+    is_flag=True,
+    help="Prints a column of the similarity matrix given a new opcode",
+)
+def debug_similarity_matrix(similarity_json_file, opcode, reverse):
     """
     Given an old opcode, debug prints a row of the similarity matrix generated
     from generate_similarity_matrix.py.
@@ -21,8 +26,13 @@ def debug_similarity_matrix(similarity_json_file, opcode):
 
     entries = dict()
     similarity = Similarity(similarity_json_file)
-    for new_opcode in similarity.new_opcodes:
-        entries[new_opcode] = similarity.lookup(opcode, new_opcode)
+    if reverse:
+        print("Checking column of matrix since --reverse was provided")
+        for old_opcode in similarity.old_opcodes:
+            entries[old_opcode] = similarity.lookup(old_opcode, opcode)
+    else:
+        for new_opcode in similarity.new_opcodes:
+            entries[new_opcode] = similarity.lookup(opcode, new_opcode)
 
     max_opcode = 0
     max_score = -9999
@@ -31,10 +41,10 @@ def debug_similarity_matrix(similarity_json_file, opcode):
 
     entries = list(entries.items())
     entries.sort(key=lambda x: x[1], reverse=True)
-    for new_opcode, similarity in entries:
-        print(f"\t{hex(new_opcode)} => {similarity}")
+    for candidate, similarity in entries:
+        print(f"\t{hex(candidate)} => {similarity}")
         if similarity > max_score:
-            max_opcode = new_opcode
+            max_opcode = candidate
             max_score = similarity
 
     print("Best match")
