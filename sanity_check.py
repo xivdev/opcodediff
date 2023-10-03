@@ -35,13 +35,22 @@ def sanity_check(vtable_diff, minor_patch_diff):
     for old_opcode, new_opcodes in diff2.items():
         if old_opcode not in diff1:
             if len(new_opcodes) < 50:
-                print(f"Missing old opcode in vtable diff: {old_opcode}")
+                print(f"Missing old opcode in vtable diff: {hex(old_opcode)}")
                 all_good = False
             continue
 
         other_new_opcodes = diff1[old_opcode]
-        if list(other_new_opcodes)[0] not in new_opcodes:
-            print(f"vtable diff mismatch for case {old_opcode} => {other_new_opcodes}")
+        vtable_new_opcode = None
+        if len(other_new_opcodes) > 0:
+            vtable_new_opcode = list(other_new_opcodes)[0]
+        elif len(new_opcodes) == 0:
+            continue
+
+        if vtable_new_opcode not in new_opcodes:
+            new_text = (
+                hex(vtable_new_opcode) if vtable_new_opcode is not None else "None"
+            )
+            print(f"vtable diff mismatch for case {hex(old_opcode)} => {new_text}")
             all_good = False
 
     if all_good:

@@ -135,6 +135,7 @@ class Similarity:
                 rev_top_matches = rev_scores[new_op]
                 if (
                     rev_top_matches[0][0] == old_op
+                    and rev_top_matches[0][1] > 0
                     and rev_top_matches[0][1] - rev_top_matches[1][1] >= threshold
                 ):
                     matches.append((old_op, new_op))
@@ -203,7 +204,7 @@ def vtable_alignment(old_exe, new_exe, similarity_json_file):
         filter(lambda x: x[0] in old_seq_set and x[1] in new_seq_set, matches)
     )
 
-    eprint(f"Found {len(matches)} confident matches")
+    eprint(f'Found {len(matches)} "confident" matches')
 
     eprint("Running initial alignment...")
     alignment, score = needleman_wunsch(old_seq, new_seq, similarity, -1)
