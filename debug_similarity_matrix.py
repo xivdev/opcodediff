@@ -29,7 +29,9 @@ def debug_similarity_matrix(similarity_json_file, opcode):
 
     print(f"Similarities for {hex(opcode)}")
 
-    for new_opcode, similarity in entries.items():
+    entries = list(entries.items())
+    entries.sort(key=lambda x: x[1], reverse=True)
+    for new_opcode, similarity in entries:
         print(f"\t{hex(new_opcode)} => {similarity}")
         if similarity > max_score:
             max_opcode = new_opcode

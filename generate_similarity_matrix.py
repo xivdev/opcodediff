@@ -9,8 +9,6 @@ from asm2vec.utils import (
 from asm2vec.datatype import Tokens
 import json
 
-import Levenshtein as lev
-
 
 def length_heuristic(l0, l1, debug=False):
     """
