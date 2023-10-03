@@ -15,7 +15,13 @@ from utils import HexIntParamType
     is_flag=True,
     help="Prints a column of the similarity matrix given a new opcode",
 )
-def debug_similarity_matrix(similarity_json_file, opcode, reverse):
+@click.option(
+    "--accept",
+    default=None,
+    help="Modifies the similarity matrix file by accepting the match between the opcode argument and the argument to this option",
+    type=HexIntParamType(),
+)
+def debug_similarity_matrix(similarity_json_file, opcode, reverse, accept):
     """
     Given an old opcode, debug prints a row of the similarity matrix generated
     from generate_similarity_matrix.py.
@@ -26,6 +32,12 @@ def debug_similarity_matrix(similarity_json_file, opcode, reverse):
 
     entries = dict()
     similarity = Similarity(similarity_json_file)
+
+    if accept is not None:
+        similarity.accept(opcode, accept)
+        similarity.write_to_file(similarity_json_file)
+        return
+
     if reverse:
         print("Checking column of matrix since --reverse was provided")
         for old_opcode in similarity.old_opcodes:

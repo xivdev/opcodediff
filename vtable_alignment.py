@@ -4,6 +4,7 @@ import numpy as np
 
 from vtable_diff import extract_opcode_data
 from utils import eprint
+from generate_similarity_matrix import write_matrix_to_file
 
 
 def needleman_wunsch(old_seq, new_seq, similarity, gap_penalty):
@@ -103,6 +104,21 @@ class Similarity:
         j = self.new_opcodes[new_opcode]
         return self.matrix[i][j]
 
+    def accept(self, old_opcode, new_opcode):
+        if old_opcode not in self.old_opcodes:
+            self.warnings.add(
+                f"WARNING: Could not find old opcode {hex(old_opcode)} in similarity matrix"
+            )
+            return
+        if new_opcode not in self.new_opcodes:
+            self.warnings.add(
+                f"WARNING: Could not find new opcode {hex(new_opcode)} in similarity matrix"
+            )
+            return
+        i = self.old_opcodes[old_opcode]
+        j = self.new_opcodes[new_opcode]
+        self.matrix[i][j] = 1
+
     def get_confident_matches(self, threshold=0.1):
         """
         Returns matches in the form of [(old,new), ...] that are confidently
@@ -148,6 +164,14 @@ class Similarity:
     def print_warnings(self):
         for warning in self.warnings:
             eprint(warning)
+
+    def write_to_file(self, output_file):
+        write_matrix_to_file(
+            output_file,
+            list(self.old_opcodes.keys()),
+            list(self.new_opcodes.keys()),
+            self.matrix.tolist(),
+        )
 
 
 @click.command()
@@ -220,7 +244,13 @@ def vtable_alignment(old_exe, new_exe, similarity_json_file):
     for old, new in alignment:
         if old in matched_old and matched_old[old] != new:
             truth = matched_old[old]
-            eprint(f"Mismatch detected! {hex(old)} => {hex(truth)}, got {hex(new)}")
+            mismatch_text = ""
+            if new is not None:
+                mismatch_text = hex(new)
+
+            eprint(
+                f"Mismatch detected! {hex(old)} => {hex(truth)}, got {mismatch_text}"
+            )
             mismatched_old.add(old)
             mismatched_new[truth] = Placeholder(old, truth)
 

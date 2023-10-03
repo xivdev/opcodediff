@@ -99,6 +99,20 @@ def print_banner(text):
     print("")
 
 
+def write_matrix_to_file(output_file, old_opcodes, new_opcodes, similarity_matrix):
+    with open(output_file, "w+") as f:
+        json.dump(
+            {
+                "old_opcodes": old_opcodes,
+                "new_opcodes": new_opcodes,
+                "matrix": similarity_matrix,
+            },
+            f,
+            indent=4,
+        )
+        print_banner(f"Output written to {output_file}")
+
+
 @click.command()
 @click.argument(
     "old_traces", type=click.Path(exists=True, file_okay=False, resolve_path=True)
@@ -166,17 +180,7 @@ def generate_similarity_matrix(old_traces, new_traces, output_file):
         csm, old_trace_data, new_trace_data
     )
 
-    with open(output_file, "w+") as f:
-        json.dump(
-            {
-                "old_opcodes": old_opcodes,
-                "new_opcodes": new_opcodes,
-                "matrix": similarity_matrix,
-            },
-            f,
-            indent=4,
-        )
-        print_banner(f"Output written to {output_file}")
+    write_matrix_to_file(output_file, old_opcodes, new_opcodes, similarity_matrix)
 
 
 if __name__ == "__main__":
