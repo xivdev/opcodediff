@@ -9,6 +9,7 @@ platformdirs==2.6.2
 python-Levenshtein==0.20.9
 r2pipe==1.7.4
 rapidfuzz==2.13.7
+semver==3.0.1
 tomli==2.0.1
 -f https://download.pytorch.org/whl/torch_stable.html
 torch==1.13.1+cu117

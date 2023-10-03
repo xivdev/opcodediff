@@ -1,15 +1,18 @@
 import click
 import json
 import re
+import semver
 
 fucked_distance = 0xFFFFFFFF
 max_size_diff = 10
 
 
 def get_zone_proto_down_sig(exe_file: str):
-    res = re.match(".*ffxiv_dx11\.(.*)\.exe", exe_file)
-    ver = res.group(1)
-    if ver == "6.40":
+    res = re.match(".*ffxiv_dx11\.(\d).(\d)(\d)(\w?)\.exe", exe_file)
+    sem_ver = f"{res.group(1)}.{res.group(2)}.{res.group(3)}"
+    if res.group(4) != "":
+        sem_ver = f"{sem_ver}+{res.group(4)}"
+    if semver.compare(sem_ver, "6.4.0") >= 0:
         return "40 53 56 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 44 24 ? 8B F2"
     else:
         return "48 89 ? 24 ? ? 48 83 EC 50 8B F2 49 8B"
