@@ -174,6 +174,131 @@ class Similarity:
         )
 
 
+def find_potential_reorders(similarity: Similarity, alignment):
+    """
+    Given an alignment, determines pairs that are potentially reordered
+    in the alignment.
+    """
+    matches = similarity.get_confident_matches()
+    old_seq = filter(lambda x: x is not None, (old for (old, _) in alignment))
+    new_seq = filter(lambda x: x is not None, (new for (_, new) in alignment))
+    old_seq_set = set(old_seq)
+    new_seq_set = set(new_seq)
+
+    # Ensure matches at least exist somewhere in the seq
+    matches = list(
+        filter(lambda x: x[0] in old_seq_set and x[1] in new_seq_set, matches)
+    )
+
+    eprint(f'Found {len(matches)} "confident" matches')
+
+    reorders = []
+
+    # Check for reorders
+    matched_old = {match[0]: match[1] for match in matches}
+
+    for old, new in alignment:
+        if old in matched_old and matched_old[old] != new:
+            truth = matched_old[old]
+            mismatched = ""
+            if new is not None:
+                mismatched = hex(new)
+
+            eprint(
+                f"Potential reorder detected! {hex(old)} => {hex(truth)}, got {mismatched}"
+            )
+            reorders.append((old, truth))
+
+    return reorders
+
+
+def calculate_score(similarity: Similarity, alignment, gap_penalty=-1):
+    """
+    Given an alignment, determines the score in O(n+m) time.
+    """
+    score = 0
+    for old, new in alignment:
+        if old is None:
+            score += gap_penalty
+        elif new is None:
+            score += gap_penalty
+        else:
+            score += similarity.lookup(old, new)
+    return score
+
+
+def reorder_and_align(similarity: Similarity, old_seq, new_seq, reorders):
+    """
+    Reorders the sequences so that the pairs in the reorders set are forced to
+    match.  Then performs an alignment.
+    """
+    old_matches = set()
+    new_matches = dict()
+    for old, new in reorders:
+        old_matches.add(old)
+        new_matches[new] = Placeholder(old, new)
+
+    old_seq = list(filter(lambda x: x not in old_matches, old_seq))
+    new_seq = list(map(lambda x: new_matches[x] if x in new_matches else x, new_seq))
+
+    similarity.clear_warnings()
+    alignment, _ = needleman_wunsch(old_seq, new_seq, similarity, -1)
+    similarity.print_warnings()
+    fixed_alignment = []
+    for old, target in alignment:
+        if isinstance(target, Placeholder):
+            fixed_alignment.append((target.old, target.new))
+        else:
+            fixed_alignment.append((old, target))
+
+    return fixed_alignment
+
+
+def find_best_alignment(
+    similarity: Similarity, original_alignment, reorders, improvement_threshold=1.0
+):
+    """
+    Iteratively tests each match to see if fixing them would result in a better
+    alignment greater than the improvement_threshold. Returns the best alignment
+    using a subset of the mismatches.
+    """
+
+    original_score = calculate_score(similarity, original_alignment)
+    old_seq = list(
+        filter(lambda x: x is not None, (old for (old, _) in original_alignment))
+    )
+    new_seq = list(
+        filter(lambda x: x is not None, (new for (_, new) in original_alignment))
+    )
+
+    promising_reorders = []
+
+    for old, new in reorders:
+        eprint(f"Testing reorder {hex(old)} => {hex(new)}")
+        candidate_alignment = reorder_and_align(
+            similarity, old_seq, new_seq, [(old, new)]
+        )
+        candidate_score = calculate_score(similarity, candidate_alignment)
+        eprint(f"Alignment score: {candidate_score}")
+        if candidate_score > original_score + improvement_threshold:
+            promising_reorders.append((old, new))
+
+    if len(promising_reorders) == 0:
+        eprint("No promising reorders")
+        return None
+
+    eprint(
+        "Testing promising reorders:",
+        {f"({hex(old)} => {hex(new)}) " for (old, new) in promising_reorders},
+    )
+    promising_alignment = reorder_and_align(
+        similarity, old_seq, new_seq, promising_reorders
+    )
+    candidate_score = calculate_score(similarity, promising_alignment)
+    eprint(f"New alignment score: {candidate_score}")
+    return promising_alignment
+
+
 @click.command()
 @click.argument(
     "old_exe", type=click.Path(exists=True, dir_okay=False, resolve_path=True)
@@ -219,65 +344,18 @@ def vtable_alignment(old_exe, new_exe, similarity_json_file):
 
     similarity = Similarity(similarity_json_file)
 
-    matches = similarity.get_confident_matches()
-
-    # Ensure matches at least exist somewhere in the seq
-    old_seq_set = set(old_seq)
-    new_seq_set = set(new_seq)
-    matches = list(
-        filter(lambda x: x[0] in old_seq_set and x[1] in new_seq_set, matches)
-    )
-
-    eprint(f'Found {len(matches)} "confident" matches')
-
     eprint("Running initial alignment...")
     alignment, score = needleman_wunsch(old_seq, new_seq, similarity, -1)
 
     similarity.print_warnings()
     eprint(f"Alignment score: {score}")
 
-    # Check for mismatches
-    matched_old = {match[0]: match[1] for match in matches}
+    eprint("Finding potential reorders")
+    reorders = find_potential_reorders(similarity, alignment)
 
-    mismatched_old = set()
-    mismatched_new = dict()
-    for old, new in alignment:
-        if old in matched_old and matched_old[old] != new:
-            truth = matched_old[old]
-            mismatch_text = ""
-            if new is not None:
-                mismatch_text = hex(new)
-
-            eprint(
-                f"Mismatch detected! {hex(old)} => {hex(truth)}, got {mismatch_text}"
-            )
-            mismatched_old.add(old)
-            mismatched_new[truth] = Placeholder(old, truth)
-
-    eprint("Attempting to fix mismatches")
-    old_seq = list(filter(lambda x: x not in mismatched_old, old_seq))
-    new_seq = list(
-        map(lambda x: mismatched_new[x] if x in mismatched_new else x, new_seq)
-    )
-
-    alignment, score = needleman_wunsch(old_seq, new_seq, similarity, -1)
-
-    old_seq = []
-    new_seq = []
-    for old, target in alignment:
-        if isinstance(target, Placeholder):
-            old_seq.append(target.old)
-            new_seq.append(target.new)
-        else:
-            if old is not None:
-                old_seq.append(old)
-            if target is not None:
-                new_seq.append(target)
-
-    similarity.clear_warnings()
-    alignment, score = needleman_wunsch(old_seq, new_seq, similarity, -1)
-    similarity.print_warnings()
-    eprint(f"Alignment score: {score}")
+    new_alignment = find_best_alignment(similarity, alignment, reorders)
+    if new_alignment is not None:
+        alignment = new_alignment
 
     diff = []
     for old, new in alignment:
