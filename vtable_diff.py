@@ -78,6 +78,29 @@ def find_opcode_matches(old_opcodes_db, new_opcodes_db):
     return matches
 
 
+def diff_exes(old_exe, new_exe):
+    old_opcodes_db = extract_opcode_data(old_exe)
+    new_opcodes_db = extract_opcode_data(new_exe)
+
+    if len(old_opcodes_db) != len(new_opcodes_db):
+        eprint(
+            f"WARNING: vtables have different sizes: {len(old_opcodes_db)} != {len(new_opcodes_db)}. Matches may not be correct."
+        )
+
+    opcodes_found = find_opcode_matches(old_opcodes_db, new_opcodes_db)
+    opcodes_object = []
+
+    for old, new in opcodes_found:
+        opcodes_object.append(
+            {
+                "old": [hex(old)],
+                "new": [hex(new)],
+            }
+        )
+
+    return opcodes_object
+
+
 @click.command()
 @click.argument(
     "old_exe", type=click.Path(exists=True, dir_okay=False, resolve_path=True)
@@ -106,25 +129,7 @@ def vtable_diff(old_exe, new_exe):
 
     python vtable_diff.py ffxiv_dx11.old.exe ffxiv_dx11.new.exe > diff.json
     """
-    old_opcodes_db = extract_opcode_data(old_exe)
-    new_opcodes_db = extract_opcode_data(new_exe)
-
-    if len(old_opcodes_db) != len(new_opcodes_db):
-        eprint(
-            f"WARNING: vtables have different sizes: {len(old_opcodes_db)} != {len(new_opcodes_db)}. Matches may not be correct."
-        )
-
-    opcodes_found = find_opcode_matches(old_opcodes_db, new_opcodes_db)
-    opcodes_object = []
-
-    for old, new in opcodes_found:
-        opcodes_object.append(
-            {
-                "old": [hex(old)],
-                "new": [hex(new)],
-            }
-        )
-
+    opcodes_object = diff_exes(old_exe, new_exe)
     print(json.dumps(opcodes_object, indent=2))
 
 

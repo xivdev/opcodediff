@@ -31,22 +31,11 @@ desired_names = {
 }
 
 
-@click.command()
-@click.argument("opcodes_file", type=click.File("r"))
-def generate_act_format(opcodes_file):
-    """
-    Parses an OPCODES_FILE and outputs opcodes in a format expected by ACT.
-    This is also just a bunch of regexes slapped together.
-
-    Outputs to stdout.
-
-    Example:
-
-    python generate_act_format.py Ipcs.h
-    """
+def write_act_format(opcodes_lines):
+    output_lines = []
     opcode_mapping = dict()
 
-    for line in opcodes_file.readlines():
+    for line in opcodes_lines:
         match_groups = re.findall(r"^\s*([^\/].*)=\s*(.*),\s*\/\/.*$", line)
         if len(match_groups) != 1:
             continue
@@ -66,11 +55,31 @@ def generate_act_format(opcodes_file):
             desired = name
         opcodes = opcode_mapping[name]
         if len(opcodes) == 1:
-            print(f"{desired}|{opcodes[0]:x}")
+            output_lines.append(f"{desired}|{opcodes[0]:x}")
         elif len(opcodes) > 1:
-            print(f'{desired}|{[f"{opcode:x}" for opcode in opcodes]}')
+            output_lines.append(f'{desired}|{[f"{opcode:x}" for opcode in opcodes]}')
         else:
-            print(f"{desired}|???")
+            output_lines.append(f"{desired}|???")
+
+    return output_lines
+
+
+@click.command()
+@click.argument("opcodes_file", type=click.File("r"))
+def generate_act_format(opcodes_file):
+    """
+    Parses an OPCODES_FILE and outputs opcodes in a format expected by ACT.
+    This is also just a bunch of regexes slapped together.
+
+    Outputs to stdout.
+
+    Example:
+
+    python generate_act_format.py Ipcs.h
+    """
+    lines = write_act_format(opcodes_file.readlines())
+    for line in lines:
+        print(line)
 
 
 if __name__ == "__main__":
