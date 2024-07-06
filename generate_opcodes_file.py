@@ -81,7 +81,7 @@ def generate_opcodes_file(
             )
         )
 
-    new_filename = f"{new_version_string}_opcodes.txt"
+    new_filename = f"Ipcs.{new_version_string}.h"
     with open(new_filename, "w+") as f:
         f.writelines(queued_lines)
 

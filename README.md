@@ -47,19 +47,19 @@ assuming there is a 1:1 correspondence between the switch cases at the same offs
 
 Example:
 ```sh
-python vtable_diff.py ffxiv_dx11.6.30.exe ffxiv_dx11.6.30h.exe > 6.30h.diff.json
+python vtable_diff.py ffxiv_dx11.7.00h.exe ffxiv_dx11.7.01.exe > 7.01.diff.json
 ```
 
 Post-diff processing:
 ```sh
-python generate_opcodes_file.py 6.30 6.30h 6.30h.diff.json Ipcs.6.30h.h
-python generate_act_format.py Ipcs.6.30h.h
+python generate_opcodes_file.py 7.00h 7.01 7.01.diff.json Ipcs.7.00h.h
+python generate_act_format.py Ipcs.7.01.h
 ```
 
 Sanity checking with the older method as validation:
 ```sh
-python minor_patch_diff.py ffxiv_dx11.6.30.exe ffxiv_dx11.6.30h.exe > 6.30h.sanity.json
-python sanity_check.py 6.30h.diff.json 6.30h.sanity.json
+python minor_patch_diff.py ffxiv_dx11.7.00h.exe ffxiv_dx11.7.01.exe > 7.01.sanitycheck.json
+python sanity_check.py 7.01.diff.json 7.01.sanitycheck.json
 ```
 
 ### Workflow for major patches
@@ -80,15 +80,15 @@ to generate a global sequence alignment of the two vtables.
 
 Example:
 ```sh
-python generate_deep_traces.py ffxiv_dx11.6.28h.exe 6.28h-traces
-python generate_deep_traces.py ffxiv_dx11.6.30.exe 6.30-traces
-python generate_similarity_matrix.py 6.28h-traces 6.30-traces 6.30.similarity.json
+python generate_deep_traces.py ffxiv_dx11.6.58h.exe 6.58h-traces
+python generate_deep_traces.py ffxiv_dx11.7.00.exe 7.00-traces
+python generate_similarity_matrix.py 6.58h-traces 7.00-traces 7.00.similarity.json
 
-python vtable_alignment.py ffxiv_dx11.6.28h.exe ffxiv_dx11.6.30.exe 6.30.similarity.json > 6.30.diff.json
+python vtable_alignment.py ffxiv_dx11.6.58h.exe ffxiv_dx11.7.00.exe 7.00.similarity.json > 7.00.diff.json
 ```
 
 ### Post-diff processing
 ```sh
-python generate_opcodes_file.py 6.30 6.30h 6.30h.diff.json Ipcs.6.30h.h
-python generate_act_format.py Ipcs.6.30h.h
+python generate_opcodes_file.py 6.58h 7.00 7.00.diff.json Ipcs.6.58h.h
+python generate_act_format.py Ipcs.7.00.h
 ```
