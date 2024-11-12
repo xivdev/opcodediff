@@ -1,7 +1,7 @@
 import click
 import json
 
-from minor_patch_diff import get_longest_switch
+from minor_patch_diff import get_correct_switch
 from utils import eprint, create_r2_byte_pattern, sync_r2_output
 import r2pipe
 
@@ -35,6 +35,7 @@ def extract_opcode_data(exe_file):
 
     p = create_r2_byte_pattern(ON_RECEIVE_PACKET_SIG)
     target = r2.cmd(f"/x {p}").split()[0]  # Find byte pattern
+    packet_handler_ea = int(target, 16)
 
     r2.cmd(f"s {target}")  # Seek to target
 
@@ -56,7 +57,9 @@ def extract_opcode_data(exe_file):
 
     ## STEP 4: Process data
     opcodes_db = dict()
-    packet_handler_switch = get_longest_switch(switch_cases)
+    switch_ea, packet_handler_switch = get_correct_switch(packet_handler_ea, switch_cases)
+    eprint(f"  Found switch at {switch_ea}")
+
     vtable_offset = 0x10
     for data in packet_handler_switch.values():
         if len(data["opcodes"]) > 10:

@@ -4,7 +4,7 @@ import pathlib
 
 from minor_patch_diff import (
     get_opcode_offset,
-    get_longest_switch,
+    get_correct_switch,
     get_zone_proto_down_sig,
 )
 
@@ -163,7 +163,8 @@ def extract_opcode_data(exe_file):
     fn_graph = r2.cmdj(f"pdrj")
 
     ## STEP 4: Process data
-    packet_handler_switch = get_longest_switch(switch_cases)
+    switch_ea, packet_handler_switch = get_correct_switch(packet_handler_ea, switch_cases)
+    eprint(f"  Found switch at {switch_ea}")
 
     opcodes_db, blocks = generate_opcodes_db(
         r2, packet_handler_switch, opcode_offset, fn_graph

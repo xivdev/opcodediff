@@ -42,7 +42,7 @@ def get_opcode_offset(r2):
     return opcode_offset
 
 
-def get_longest_switch(switch_cases):
+def get_correct_switch(approx_ea, switch_cases):
     switches = dict()
 
     pattern = re.compile("case\.(0x[0-9a-fA-F]+)\.(\d+)")
@@ -61,12 +61,17 @@ def get_longest_switch(switch_cases):
                 }
             switches[switch_ea][case_ea]["opcodes"].append(match[2])
 
+    found_switch = None
     longest_switch = dict()
     for switch_ea in switches:
+        int_switch_ea = int(switch_ea, 16)
+        if int_switch_ea < approx_ea or int_switch_ea > approx_ea+0x100:
+            continue
         if len(switches[switch_ea].keys()) > len(longest_switch):
+            found_switch = switch_ea
             longest_switch = switches[switch_ea]
 
-    return longest_switch
+    return found_switch, longest_switch
 
 
 def get_block_sizes(blocks):
@@ -126,7 +131,9 @@ def extract_opcode_data(exe_file):
     eprint(f"  Grabbed blocks from packet handler")
 
     ## STEP 4: Process data
-    packet_handler_switch = get_longest_switch(switch_cases)
+    switch_ea, packet_handler_switch = get_correct_switch(packet_handler_ea, switch_cases)
+    eprint(f"  Found switch at {switch_ea}")
+
     block_sizes = get_block_sizes(blocks)
     opcodes_db = generate_opcodes_db(
         packet_handler_ea, packet_handler_switch, opcode_offset, block_sizes
