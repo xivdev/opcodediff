@@ -7,16 +7,50 @@ fucked_distance = 0xFFFFFFFF
 max_size_diff = 10
 
 
-def get_zone_proto_down_sig(exe_file: str):
+def get_sem_ver(exe_file: str):
     res = re.match(".*ffxiv_dx11\.(\d).(\d)(\d)(\w?)\.exe", exe_file)
     sem_ver = f"{res.group(1)}.{res.group(2)}.{res.group(3)}"
     if res.group(4) != "":
         sem_ver = f"{sem_ver}+{res.group(4)}"
-    if semver.compare(sem_ver, "6.4.0") >= 0:
+    return sem_ver
+
+def get_zone_proto_down_sig(sem_ver: str):
+    if semver.compare(sem_ver, "7.2.0") >= 0:
+        return "40 55 53 56 57 41 55 41 56 41 57 48 8D AC 24 ? ? ? ? B8 ? ? ? ? E8 ? ? ? ? 48 2B E0 48 8B 05 ? ? ? ? 48 33 C4 48 89 85 ? ? ? ? 45 0F B7 78 ?"
+        # return "E8 ? ? ? ? 41 83 C7 9A EB 1B"
+    elif semver.compare(sem_ver, "6.4.0") >= 0:
         return "40 53 56 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 44 24 ? 8B F2"
     else:
         return "48 89 ? 24 ? ? 48 83 EC 50 8B F2 49 8B"
 
+def get_opcode_offset_sig(sem_ver: str):
+    if semver.compare(sem_ver, "7.2.0") >= 0:
+        return "E8 ? ? ? ? 41 83 C7 9A EB 1B"
+    elif semver.compare(sem_ver, "6.4.0") >= 0:
+        return "40 53 56 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 44 24 ? 8B F2"
+    else:
+        return "48 89 ? 24 ? ? 48 83 EC 50 8B F2 49 8B"
+
+
+def get_opcode_offset_7_20(r2):
+    orig_loc = r2.cmd("s")  # Save original spot
+    r2.cmd("aei")  # Initialize ESIL VM
+    r2.cmd("aeim")  # Initialize ESIL VM stack
+    r2.cmd("aeip")  # Initialize ESIL VM IP to curseek
+    r2.cmd("aeso") # step over call
+    r2.cmd("aer r15=0x500")  # set r15 to some arbitrary number
+    r2.cmd("aeso")  # step
+
+    regs = r2.cmdj("arj")
+    opcode_offset = 0x500 - regs["r15"]
+
+    # Clear the ESIL environment
+    r2.cmd("ar0")
+    r2.cmd("aeim-")
+    r2.cmd("aei-")
+    r2.cmd(f"s {orig_loc}")  # Seek back to original spot
+
+    return opcode_offset
 
 def get_opcode_offset(r2):
     orig_loc = r2.cmd("s")  # Save original spot
@@ -105,10 +139,10 @@ def extract_opcode_data(exe_file):
 
     sync_r2_output(r2)
 
-    p = create_r2_byte_pattern(get_zone_proto_down_sig(exe_file))
+    sem_ver = get_sem_ver(exe_file)
+    p = create_r2_byte_pattern(get_zone_proto_down_sig(sem_ver))
     target = r2.cmd(f"/x {p}").split()[0]  # Find byte pattern
     packet_handler_ea = int(target, 16)
-
     r2.cmd(f"s {target}")  # Seek to target
 
     ## STEP 1: Grab switch cases
@@ -119,9 +153,18 @@ def extract_opcode_data(exe_file):
     eprint(f"  Loaded switch cases")
 
     ## STEP 2: Grab opcode offset
+    p = create_r2_byte_pattern(get_opcode_offset_sig(sem_ver))
+    opcode_offset_target = r2.cmd(f"/x {p}").split()[0]  # Find byte pattern
+    packet_handler_ea = int(opcode_offset_target, 16)
+    r2.cmd(f"s {opcode_offset_target}")  # Seek to target
 
-    opcode_offset = get_opcode_offset(r2)
+    if semver.compare(sem_ver, "7.2.0") >= 0:
+        opcode_offset = get_opcode_offset_7_20(r2)
+    else:
+        opcode_offset = get_opcode_offset(r2)
     eprint(f"  Found opcode offset: {opcode_offset}")
+
+    r2.cmd(f"s {target}")  # Seek to original target
 
     ## STEP 3: Grab blocks from packet handler
     blocks = r2.cmdj("afbj")

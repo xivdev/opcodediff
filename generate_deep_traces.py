@@ -1,11 +1,15 @@
 import click
 import json
 import pathlib
+import semver
 
 from minor_patch_diff import (
+    get_sem_ver,
     get_opcode_offset,
+    get_opcode_offset_7_20,
     get_correct_switch,
     get_zone_proto_down_sig,
+    get_opcode_offset_sig
 )
 
 
@@ -142,7 +146,8 @@ def extract_opcode_data(exe_file):
 
     sync_r2_output(r2)
 
-    p = create_r2_byte_pattern(get_zone_proto_down_sig(exe_file))
+    sem_ver = get_sem_ver(exe_file)
+    p = create_r2_byte_pattern(get_zone_proto_down_sig(sem_ver))
     target = r2.cmd(f"/x {p}").split()[0]  # Find byte pattern
     packet_handler_ea = int(target, 16)
 
@@ -156,8 +161,18 @@ def extract_opcode_data(exe_file):
     eprint(f"  Loaded switch cases")
 
     ## STEP 2: Grab opcode offset
-    opcode_offset = get_opcode_offset(r2)
+    p = create_r2_byte_pattern(get_opcode_offset_sig(sem_ver))
+    opcode_offset_target = r2.cmd(f"/x {p}").split()[0]  # Find byte pattern
+    packet_handler_ea = int(opcode_offset_target, 16)
+    r2.cmd(f"s {opcode_offset_target}")  # Seek to target
+
+    if semver.compare(sem_ver, "7.2.0") >= 0:
+        opcode_offset = get_opcode_offset_7_20(r2)
+    else:
+        opcode_offset = get_opcode_offset(r2)
     eprint(f"  Found opcode offset: {opcode_offset}")
+
+    r2.cmd(f"s {target}")  # Seek to original target
 
     ## STEP 3: Grab function graph
     fn_graph = r2.cmdj(f"pdrj")
