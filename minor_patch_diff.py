@@ -25,7 +25,7 @@ def get_zone_proto_down_sig(sem_ver: str):
 
 def get_opcode_offset_sig(sem_ver: str):
     if semver.compare(sem_ver, "7.2.0") >= 0:
-        return "E8 ? ? ? ? 41 83 C7 9A EB 1B"
+        return "E8 ? ? ? ? 41 83 C7 ? EB 1B"
     elif semver.compare(sem_ver, "6.4.0") >= 0:
         return "40 53 56 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 44 24 ? 8B F2"
     else:
