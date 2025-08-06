@@ -4,12 +4,13 @@ import pathlib
 import semver
 
 from minor_patch_diff import (
+    get_opcode_offset_7_30,
     get_sem_ver,
     get_opcode_offset,
     get_opcode_offset_7_20,
     get_correct_switch,
     get_zone_proto_down_sig,
-    get_opcode_offset_sig
+    get_opcode_offset_sig,
 )
 
 
@@ -166,7 +167,9 @@ def extract_opcode_data(exe_file):
     packet_handler_ea = int(opcode_offset_target, 16)
     r2.cmd(f"s {opcode_offset_target}")  # Seek to target
 
-    if semver.compare(sem_ver, "7.2.0") >= 0:
+    if semver.compare(sem_ver, "7.3.0") >= 0:
+        opcode_offset = get_opcode_offset_7_30(r2)
+    elif semver.compare(sem_ver, "7.2.0") >= 0:
         opcode_offset = get_opcode_offset_7_20(r2)
     else:
         opcode_offset = get_opcode_offset(r2)
@@ -178,7 +181,9 @@ def extract_opcode_data(exe_file):
     fn_graph = r2.cmdj(f"pdrj")
 
     ## STEP 4: Process data
-    switch_ea, packet_handler_switch = get_correct_switch(packet_handler_ea, switch_cases)
+    switch_ea, packet_handler_switch = get_correct_switch(
+        packet_handler_ea, switch_cases
+    )
     eprint(f"  Found switch at {switch_ea}")
 
     opcodes_db, blocks = generate_opcodes_db(

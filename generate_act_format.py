@@ -7,6 +7,7 @@ desired_names = {
     "StatusEffectList2": None,
     "StatusEffectList3": None,
     "BossStatusEffectList": None,
+    "StatusEffectList4": "StatusEffectListForay3",
     "Effect": "Ability1",
     "AoeEffect8": "Ability8",
     "AoeEffect16": "Ability16",
