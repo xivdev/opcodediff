@@ -1,11 +1,28 @@
 import click
 import json
 
-from minor_patch_diff import get_correct_switch
+from analysis_utils import get_correct_switch
 from utils import eprint, create_r2_byte_pattern, sync_r2_output
 import r2pipe
 
-ON_RECEIVE_PACKET_SIG = "49 8B 40 10 4C 8B 50 38"
+PACKET_INTERFACE_DISPATCHER_SIG = "49 8B 40 10 4C 8B 50 38"
+"""
+Signature for some dispatcher function that delegates packet opcodes to
+a ZoneDown packet interface. In IDA it has a length of approximately 0x28D5.
+It should just contain a large switch statement with handlers that call a
+function pointer and look like this:
+
+```
+mov     rax, [rcx]
+lea     r9, [r10+10h]
+jmp     qword ptr [rax+10h]
+```
+
+In reality this dispatcher actually does nothing, as it delegates to vtable
+containing only nullsubs. However, the order of these nullsubs in the vtable
+is fairly stable across versions for the ZoneDown opcodes. For minor patches,
+they might also work for ZoneUp opcodes.
+"""
 
 
 def get_opcode_offset(r2):
@@ -33,9 +50,8 @@ def extract_opcode_data(exe_file):
 
     sync_r2_output(r2)
 
-    p = create_r2_byte_pattern(ON_RECEIVE_PACKET_SIG)
+    p = create_r2_byte_pattern(PACKET_INTERFACE_DISPATCHER_SIG)
     target = r2.cmd(f"/x {p}").split()[0]  # Find byte pattern
-    packet_handler_ea = int(target, 16)
 
     r2.cmd(f"s {target}")  # Seek to target
 
@@ -57,7 +73,7 @@ def extract_opcode_data(exe_file):
 
     ## STEP 4: Process data
     opcodes_db = dict()
-    switch_ea, packet_handler_switch = get_correct_switch(packet_handler_ea, switch_cases)
+    switch_ea, packet_handler_switch = get_correct_switch(target, switch_cases)
     eprint(f"  Found switch at {switch_ea}")
 
     vtable_offset = 0x10
@@ -113,7 +129,8 @@ def diff_exes(old_exe, new_exe):
 )
 def vtable_diff(old_exe, new_exe):
     """
-    Generates an opcode diff file by comparing vtables.
+    Generates an opcode diff file by comparing vtables. See comments in file
+    for a detailed explanation.
 
     This script outputs to stdout, so pipe it to a json file.
 

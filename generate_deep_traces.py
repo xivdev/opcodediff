@@ -1,16 +1,12 @@
 import click
 import json
 import pathlib
-import semver
 
-from minor_patch_diff import (
-    get_opcode_offset_7_30,
-    get_sem_ver,
-    get_opcode_offset,
-    get_opcode_offset_7_20,
+from analysis_utils import (
     get_correct_switch,
-    get_zone_proto_down_sig,
-    get_opcode_offset_sig,
+    get_packet_handler_addr,
+    get_packet_handler_opcode_offset,
+    get_packet_handler_switch_addr,
 )
 
 
@@ -137,7 +133,7 @@ def generate_opcodes_db(r2, switch, opcode_offset, fn_graph):
 
 
 def extract_opcode_data(exe_file):
-    from utils import eprint, create_r2_byte_pattern, sync_r2_output
+    from utils import eprint, sync_r2_output
 
     import r2pipe
 
@@ -146,11 +142,7 @@ def extract_opcode_data(exe_file):
 
     sync_r2_output(r2)
 
-    sem_ver = get_sem_ver(exe_file)
-    p = create_r2_byte_pattern(get_zone_proto_down_sig(sem_ver))
-    target = r2.cmd(f"/x {p}").split()[0]  # Find byte pattern
-    packet_handler_ea = int(target, 16)
-
+    target = get_packet_handler_addr(r2, exe_file)
     r2.cmd(f"s {target}")  # Seek to target
 
     ## STEP 1: Grab switch cases
@@ -160,18 +152,8 @@ def extract_opcode_data(exe_file):
 
     eprint(f"  Loaded switch cases")
 
-    ## STEP 2: Grab opcode offset
-    p = create_r2_byte_pattern(get_opcode_offset_sig(sem_ver))
-    opcode_offset_target = r2.cmd(f"/x {p}").split()[0]  # Find byte pattern
-    packet_handler_ea = int(opcode_offset_target, 16)
-    r2.cmd(f"s {opcode_offset_target}")  # Seek to target
-
-    if semver.compare(sem_ver, "7.3.0") >= 0:
-        opcode_offset = get_opcode_offset_7_30(r2)
-    elif semver.compare(sem_ver, "7.2.0") >= 0:
-        opcode_offset = get_opcode_offset_7_20(r2)
-    else:
-        opcode_offset = get_opcode_offset(r2)
+    ## STEP 2: Get opcode offset
+    opcode_offset = get_packet_handler_opcode_offset(r2, exe_file)
     eprint(f"  Found opcode offset: {opcode_offset}")
 
     r2.cmd(f"s {target}")  # Seek to original target
@@ -180,6 +162,7 @@ def extract_opcode_data(exe_file):
     fn_graph = r2.cmdj(f"pdrj")
 
     ## STEP 4: Process data
+    packet_handler_ea = get_packet_handler_switch_addr(r2, exe_file)
     switch_ea, packet_handler_switch = get_correct_switch(
         packet_handler_ea, switch_cases
     )

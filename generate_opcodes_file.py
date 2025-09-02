@@ -57,7 +57,10 @@ def replace_line_with_new_opcode(line, diff, ver, old_ver):
     "--reverse", is_flag=True, help="Applies the diff file in the opposite direction"
 )
 @click.option(
-    "-o", "--output", type=click.Path(exists = False, resolve_path=True), help="Output filename"
+    "-o",
+    "--output",
+    type=click.Path(exists=False, resolve_path=True),
+    help="Output filename",
 )
 def generate_opcodes_file(
     old_version_string, new_version_string, diff_file, opcodes_file, reverse, output
@@ -87,7 +90,7 @@ def generate_opcodes_file(
     if output:
         new_filename = output
     else:
-        new_filename = f"Ipcs.{new_version_string}.h"
+        new_filename = f"ipcs/Ipcs.{new_version_string}.h"
     with open(new_filename, "w+") as f:
         f.writelines(queued_lines)
 
