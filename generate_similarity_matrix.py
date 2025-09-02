@@ -76,7 +76,7 @@ def full_similarity_matrix(
             # Now we copy this similarity value for all opcodes in the new
             # switch case
             for op in new_data["opcodes"]:
-                similarities.append(score)
+                similarities.append(float(score))
         # Now we copy this similarity mapping for all opcodes in the old
         # switch case
         for op in old_data["opcodes"]:

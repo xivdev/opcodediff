@@ -8,7 +8,7 @@ max_size_diff = 10
 
 
 def get_sem_ver(exe_file: str):
-    res = re.match(".*ffxiv_dx11\.(\d).(\d)(\d)(\w?)(\d?)\.exe", exe_file)
+    res = re.match(r".*ffxiv_dx11\.(\d).(\d)(\d)(\w?)(\d?)\.exe", exe_file)
     sem_ver = f"{res.group(1)}.{res.group(2)}.{res.group(3)}"
     if res.group(4) != "":
         sem_ver = f"{sem_ver}+{res.group(4)}"
@@ -106,13 +106,13 @@ def get_opcode_offset(r2):
 def get_correct_switch(approx_ea, switch_cases):
     switches = dict()
 
-    pattern = re.compile("case\.(0x[0-9a-fA-F]+)\.(\d+)")
+    pattern = re.compile(r"case\.(0x[0-9a-fA-F]+)\.(\d+)")
 
     for l in switch_cases:
         match = pattern.match(l["name"])
         if match is not None:
             switch_ea = match[1]
-            case_ea = l["offset"]
+            case_ea = l["addr"]
 
             if switch_ea not in switches:
                 switches[switch_ea] = dict()

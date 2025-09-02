@@ -326,7 +326,9 @@ def load_model(path, device="cpu"):
 
 
 def accuracy(y, probs):
-    return torch.mean(torch.tensor([torch.sum(probs[i][yi]) for i, yi in enumerate(y)]))
+    return torch.mean(
+        torch.tensor([torch.sum(probs[i][yi].detach()) for i, yi in enumerate(y)])
+    )
 
 
 def cosine_similarities(model):

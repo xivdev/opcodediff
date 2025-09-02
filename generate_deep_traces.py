@@ -72,8 +72,7 @@ class BlockDict(dict):
         ).splitlines()
         missing_blocks = [json.loads(block_json) for block_json in block_json_list]
         additional_blocks = {
-            missing_block[0]["offset"]: missing_block
-            for missing_block in missing_blocks
+            missing_block[0]["addr"]: missing_block for missing_block in missing_blocks
         }
         self.update(additional_blocks)
 

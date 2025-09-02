@@ -5,7 +5,7 @@ binary.
 
 ## Prerequisites
 
-1. Ensure you have python >= 3.7 installed.
+1. Ensure you have python == 3.12 installed.
 
 1. Set up a python venv:
    ```sh
