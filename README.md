@@ -30,7 +30,7 @@ binary.
    pip install -r requirements.txt
    ```
 
-1. Ensure you have [radare](https://github.com/radareorg/radare2) somewhere on
+1. Ensure you have [radare](https://github.com/radareorg/radare2) version 6.x somewhere on
     your PATH
 
 1. For `generate_similarity_matrix.py`, an NVIDIA GPU and CUDA support are highly recommended,
