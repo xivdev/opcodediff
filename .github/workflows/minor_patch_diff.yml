@@ -1,0 +1,85 @@
+name: Minor Patch Diff Workflow
+
+on:
+  schedule:
+    - cron: '0 7 * * *' # 11PM PST is 7AM UTC
+  workflow_dispatch:
+
+jobs:
+  check-and-diff:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download Latest ffxiv_dx11.exe
+        id: downloader-latest
+        uses: WorkingRobot/ffxiv-downloader@v8
+        with:
+          output-path: latest
+          regex: '^ffxiv_dx11\.exe$'
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Fetch Patch Info and Update Versions
+        id: versions
+        if: steps.downloader-latest.outputs.updated == 'true' || github.event_name == 'workflow_dispatch'
+        run: python automation/ffxiv_info.py >> $GITHUB_OUTPUT
+
+      - name: Download Previous ffxiv_dx11.exe
+        if: steps.versions.outputs.is_new == 'true'
+        uses: WorkingRobot/ffxiv-downloader@v8
+        with:
+          version: ${{ steps.versions.outputs.date_prev }}
+          output-path: previous
+          regex: '^ffxiv_dx11\.exe$'
+
+      - name: Install Analysis Tools
+        if: steps.versions.outputs.is_new == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y radare2
+
+      - name: Install Python Dependencies
+        if: steps.versions.outputs.is_new == 'true'
+        run: |
+          pip install -r requirements.txt
+
+      - name: Run Diff
+        if: steps.versions.outputs.is_new == 'true'
+        run: |
+          LATEST_EXE=$(find latest -name "ffxiv_dx11.exe" | head -n 1)
+          PREVIOUS_EXE=$(find previous -name "ffxiv_dx11.exe" | head -n 1)
+
+          mv "$LATEST_EXE" "ffxiv_dx11.${{ steps.versions.outputs.retail_new }}.exe"
+          mv "$PREVIOUS_EXE" "ffxiv_dx11.${{ steps.versions.outputs.retail_prev }}.exe"
+
+          # Run the diffing process and capture JSON output
+          python vtable_diff.py "ffxiv_dx11.${{ steps.versions.outputs.retail_prev }}.exe" "ffxiv_dx11.${{ steps.versions.outputs.retail_new }}.exe" > "diffs/${{ steps.versions.outputs.retail_new }}.diff.json"
+
+      - name: Create Pull Request
+        if: steps.versions.outputs.is_new == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "Update for retail version ${{ steps.versions.outputs.retail_new }} (${{ steps.versions.outputs.date_new }})"
+          title: "Update for retail version ${{ steps.versions.outputs.retail_new }} (${{ steps.versions.outputs.date_new }})"
+          body: |
+            This automatic update contains the following changes:
+            - Updated `ffxiv_versions_global.json`
+            - Generated vtable diff for retail version ${{ steps.versions.outputs.retail_new }}
+          branch: "auto-update-${{ steps.versions.outputs.date_new }}"
+          base: "main"
+          delete-branch: true
+
+      - name: Upload Results
+        if: steps.versions.outputs.is_new == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: vtable-diffs-${{ steps.versions.outputs.date_new }}
+          path: |
+            diffs/*.diff.json

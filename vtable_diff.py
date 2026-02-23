@@ -1,5 +1,6 @@
 import click
 import json
+import sys
 
 from analysis_utils import get_correct_switch
 from utils import eprint, create_r2_byte_pattern, sync_r2_output
@@ -103,8 +104,9 @@ def diff_exes(old_exe, new_exe):
 
     if len(old_opcodes_db) != len(new_opcodes_db):
         eprint(
-            f"WARNING: vtables have different sizes: {len(old_opcodes_db)} != {len(new_opcodes_db)}. Matches may not be correct."
+            f"ERROR: vtables have different sizes: {len(old_opcodes_db)} != {len(new_opcodes_db)}. Refusing to continue."
         )
+        sys.exit(1)
 
     opcodes_found = find_opcode_matches(old_opcodes_db, new_opcodes_db)
     opcodes_object = []
