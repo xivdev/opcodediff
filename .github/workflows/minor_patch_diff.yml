@@ -41,8 +41,9 @@ jobs:
       - name: Install Analysis Tools
         if: steps.versions.outputs.is_new == 'true'
         run: |
-          sudo apt-get update
-          sudo apt-get install -y radare2
+          curl -L -o radare2.deb https://github.com/radareorg/radare2/releases/download/6.1.0/radare2_6.1.0_amd64.deb
+          sudo dpkg -i radare2.deb || sudo apt-get install -f -y
+          rm radare2.deb
 
       - name: Install Python Dependencies
         if: steps.versions.outputs.is_new == 'true'
