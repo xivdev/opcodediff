@@ -47,7 +47,7 @@ jobs:
       - name: Install Python Dependencies
         if: steps.versions.outputs.is_new == 'true'
         run: |
-          pip install -r requirements.txt
+          pip install -r requirements-vtable.txt
 
       - name: Run Diff
         if: steps.versions.outputs.is_new == 'true'
@@ -55,8 +55,8 @@ jobs:
           LATEST_EXE=$(find latest -name "ffxiv_dx11.exe" | head -n 1)
           PREVIOUS_EXE=$(find previous -name "ffxiv_dx11.exe" | head -n 1)
 
-          mv "$LATEST_EXE" "ffxiv_dx11.${{ steps.versions.outputs.retail_new }}.exe"
-          mv "$PREVIOUS_EXE" "ffxiv_dx11.${{ steps.versions.outputs.retail_prev }}.exe"
+          cp "$LATEST_EXE" "ffxiv_dx11.${{ steps.versions.outputs.retail_new }}.exe"
+          cp "$PREVIOUS_EXE" "ffxiv_dx11.${{ steps.versions.outputs.retail_prev }}.exe"
 
           # Run the diffing process and capture JSON output
           python vtable_diff.py "ffxiv_dx11.${{ steps.versions.outputs.retail_prev }}.exe" "ffxiv_dx11.${{ steps.versions.outputs.retail_new }}.exe" > "diffs/${{ steps.versions.outputs.retail_new }}.diff.json"
