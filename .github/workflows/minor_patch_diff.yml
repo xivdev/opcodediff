@@ -13,7 +13,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Download Latest ffxiv_dx11.exe
         id: downloader-latest
@@ -23,7 +23,7 @@ jobs:
           regex: '^ffxiv_dx11\.exe$'
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
           cache: 'pip'
@@ -67,11 +67,11 @@ jobs:
 
       - name: Upload Results
         if: steps.versions.outputs.is_new == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
-          name: vtable-diffs-${{ steps.versions.outputs.date_new }}
+          name: diff
           path: |
-            diffs/*.diff.json
+            diffs/${{ steps.versions.outputs.retail_new }}.diff.json
 
       - name: Create Pull Request
         if: steps.versions.outputs.is_new == 'true'
@@ -84,7 +84,8 @@ jobs:
             This automatic update contains the following changes:
             - Updated `ffxiv_versions_global.json`
             - Generated opcode diff for retail version ${{ steps.versions.outputs.retail_new }}
-          branch: "auto-update/${{ steps.versions.outputs.date_new }}"
+          branch: "auto-update"
+          branch-suffix: "short-commit-hash"
           base: "main"
           delete-branch: true
 
