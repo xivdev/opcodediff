@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Opcode Diff Applier</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .controls {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .textareas {
+            display: flex;
+            gap: 20px;
+        }
+        .textarea-group {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        textarea {
+            height: 500px;
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 13px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            resize: vertical;
+        }
+        label {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #ccc;
+        }
+        select {
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Opcode Diff Applier</h1>
+        <div class="controls">
+            <div>
+                <label for="diff-select">Select Diff:</label>
+                <select id="diff-select">
+                    <option value="">Loading diffs...</option>
+                </select>
+            </div>
+            <button id="apply-btn" disabled>Apply Diff</button>
+        </div>
+        <div class="textareas">
+            <div class="textarea-group">
+                <label for="old-content" id="old-label">Old File Content:</label>
+                <textarea id="old-content" placeholder="Paste content from C-style IPCs file or ACT format here..."></textarea>
+            </div>
+            <div class="textarea-group">
+                <label for="new-content" id="new-label">New File Content:</label>
+                <textarea id="new-content" readonly placeholder="Result will appear here..."></textarea>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const REPO = 'xivdev/opcodediff';
+        const DIFFS_DIR = 'diffs';
+        const diffSelect = document.getElementById('diff-select');
+        const applyBtn = document.getElementById('apply-btn');
+        const oldContent = document.getElementById('old-content');
+        const newContent = document.getElementById('new-content');
+        const oldLabel = document.getElementById('old-label');
+        const newLabel = document.getElementById('new-label');
+
+        let loadedDiffs = {};
+        let diffFilesList = [];
+
+        async function fetchDiffList() {
+            try {
+                const response = await fetch(`https://api.github.com/repos/${REPO}/contents/${DIFFS_DIR}`);
+                const files = await response.json();
+
+                diffFilesList = files
+                    .filter(f => f.name.endsWith('.diff.json'))
+                    .sort((a, b) => {
+                        return b.name.localeCompare(a.name, undefined, { numeric: true, sensitivity: 'base' });
+                    });
+
+                diffSelect.innerHTML = '<option value="">-- Choose a version --</option>';
+            diffFilesList.forEach((file, index) => {
+                    const option = document.createElement('option');
+                    option.value = file.download_url;
+                    option.dataset.index = index;
+                    option.textContent = file.name;
+                    diffSelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error fetching diff list:', error);
+                diffSelect.innerHTML = '<option value="">Error loading diffs</option>';
+            }
+        }
+
+        diffSelect.addEventListener('change', async () => {
+            if (!diffSelect.value) {
+                applyBtn.disabled = true;
+                oldLabel.textContent = 'Old File Content:';
+                newLabel.textContent = 'New File Content:';
+                return;
+            }
+            applyBtn.disabled = false;
+
+            const selectedOption = diffSelect.options[diffSelect.selectedIndex];
+            const currentIndex = parseInt(selectedOption.dataset.index);
+            const newVersion = selectedOption.text.replace('.diff.json', '');
+
+            // The list is sorted descending (newest first).
+            // So the 'previous' version in chronological order is the one AFTER it in the list.
+            let oldVersion = 'Old';
+            if (currentIndex < diffFilesList.length - 1) {
+                oldVersion = diffFilesList[currentIndex + 1].name.replace('.diff.json', '');
+            }
+
+            oldLabel.textContent = `Old File Content (${oldVersion}):`;
+            newLabel.textContent = `New File Content (${newVersion}):`;
+
+            // Store oldVersion for use in applyDiff
+            applyBtn.dataset.oldVersion = oldVersion;
+        });
+
+        applyBtn.addEventListener('click', async () => {
+            const diffUrl = diffSelect.value;
+            const diffName = diffSelect.options[diffSelect.selectedIndex].text;
+            const newVersion = diffName.replace('.diff.json', '');
+            const oldVersion = applyBtn.dataset.oldVersion;
+
+            try {
+                applyBtn.disabled = true;
+                applyBtn.textContent = 'Applying...';
+
+                let diffData;
+                if (loadedDiffs[diffUrl]) {
+                    diffData = loadedDiffs[diffUrl];
+                } else {
+                    const response = await fetch(diffUrl);
+                    diffData = await response.json();
+                    loadedDiffs[diffUrl] = diffData;
+                }
+
+                const result = applyDiff(oldContent.value, diffData, newVersion, oldVersion);
+                newContent.value = result;
+            } catch (error) {
+                console.error('Error applying diff:', error);
+                alert('Error applying diff. See console for details.');
+            } finally {
+                applyBtn.disabled = false;
+                applyBtn.textContent = 'Apply Diff';
+            }
+        });
+
+        function getNormalizedHex(val) {
+            if (!val) return '';
+            return val.toLowerCase().startsWith('0x') ? val.substring(2).toLowerCase() : val.toLowerCase();
+        }
+
+        function createDiffMap(diff) {
+            const diffMap = new Map();
+            diff.forEach(entry => {
+                const oldVal = entry.old[0];
+                const newVal = entry.new[0];
+                if (oldVal && newVal) {
+                    diffMap.set(getNormalizedHex(oldVal), getNormalizedHex(newVal));
+                }
+            });
+            return diffMap;
+        }
+
+        function processEnumLine(line, diffMap, oldVersion, newVersion) {
+            const enumRegex = /^(\s*\w+\s*=\s*)(0x[0-9a-fA-F]+|[0-9a-fA-F]+)([\s,;]*)/;
+            const match = line.match(enumRegex);
+            if (!match) return null;
+
+            const [fullMatch, prefix, valStr, suffix] = match;
+
+            // Only update if it has the specific "updated OLD_VERSION" comment
+            const versionPattern = new RegExp(`// updated\\s+${oldVersion.replace('.', '\\.')}`);
+            if (!versionPattern.test(line)) return null;
+
+            const newVal = diffMap.get(getNormalizedHex(valStr));
+            if (!newVal) return null;
+
+            const formattedNewVal = valStr.toLowerCase().startsWith('0x') ? '0x' + newVal : newVal;
+            let updatedLine = line.replace(prefix + valStr + suffix, prefix + formattedNewVal + suffix);
+
+            // Update the version comment
+            return updatedLine.replace(/\/\/ updated\s+(\d+\.\d+\w*)/, `// updated ${newVersion}`);
+        }
+
+        function processPipeLine(line, diffMap) {
+            const pipeRegex = /^([^|]+\|)([0-9a-fA-F]+)$/;
+            const match = line.match(pipeRegex);
+            if (!match) return null;
+
+            const [fullMatch, prefix, val] = match;
+            const newVal = diffMap.get(getNormalizedHex(val));
+            if (!newVal) return null;
+
+            return prefix + newVal;
+        }
+
+        function applyDiff(text, diff, newVersion, oldVersion) {
+            const diffMap = createDiffMap(diff);
+            const lines = text.split('\n');
+
+            const resultLines = lines.map(line => {
+                // Try Enum format first
+                const updatedEnum = processEnumLine(line, diffMap, oldVersion, newVersion);
+                if (updatedEnum !== null) return updatedEnum;
+
+                // Try Pipe format
+                const updatedPipe = processPipeLine(line, diffMap);
+                if (updatedPipe !== null) return updatedPipe;
+
+                return line;
+            });
+
+            return resultLines.join('\n');
+        }
+
+        fetchDiffList();
+    </script>
+</body>
+</html>
