@@ -17,8 +17,9 @@ VERSIONS_FILE = os.path.join(BASE_DIR, "automation", "ffxiv_versions_global.json
 def fetch_url(url, is_json=False):
     print(f"Fetching {url}...", file=sys.stderr)
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-        "accept": "application/json",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
     }
     req = urllib.request.Request(url, headers=headers)
     try:
@@ -27,6 +28,22 @@ def fetch_url(url, is_json=False):
             if is_json:
                 return json.loads(content)
             return content
+    except urllib.error.HTTPError as e:
+        if e.code == 503:
+            print(
+                f"  Received 503 for {url}. Maintenance mode. Reading body anyway...",
+                file=sys.stderr,
+            )
+            try:
+                content = e.read().decode("utf-8")
+                if is_json:
+                    return json.loads(content)
+                return content
+            except Exception:
+                return None
+        else:
+            print(f"  HTTP Error {e.code}: {e.reason}", file=sys.stderr)
+        return None
     except Exception as e:
         print(f"  Error fetching {url}: {e}", file=sys.stderr)
         return None
@@ -83,23 +100,29 @@ def fetch_latest_thaliak_patch() -> Optional[str]:
 
 def parse_lodestone_news_list(html):
     """
-    Parses the Lodestone news category page to extract individual news items.
+    Parses the Lodestone news list to extract news items (URL, Title, and Timestamp).
+    Handles the structure found on both the news category and the main landing page.
     """
     if not html:
         return []
+
+    # This pattern captures the link and the title following it within the same list item structure.
+    # It accounts for the multi-line whitespace and optional tags like [Maintenance].
+    # Timestamp is optional as fallback pages may not have the JS helper.
     pattern = re.compile(
-        r'<li class="news__list">.*?<a href="(?P<url>/lodestone/news/detail/[^"]+)"[^>]*>.*?<p class="news__list--title">(?:<span[^>]*>.*?</span>)?(?P<title>.*?)</p>.*?ldst_strftime\((?P<timestamp>\d+)',
-        re.DOTALL,
+        r'<a [^>]*href="(?P<url>/lodestone/news/detail/[^"]+)"[^>]*>.*?<p [^>]*class="news__list--title"[^>]*>(?P<title_content>.*?)</p>(?:.*?ldst_strftime\((?P<timestamp>\d+))?',
+        re.DOTALL | re.I,
     )
+
     items = []
     for match in pattern.finditer(html):
-        items.append(
-            {
-                "url": "https://na.finalfantasyxiv.com" + match.group("url"),
-                "title": match.group("title").strip(),
-                "timestamp": int(match.group("timestamp")),
-            }
-        )
+        url = "https://na.finalfantasyxiv.com" + match.group("url")
+        # Clean title content of tags and whitespace
+        content = match.group("title_content")
+        title = re.sub(r"<[^>]+>", "", content).strip()
+        timestamp = int(match.group("timestamp")) if match.group("timestamp") else 0
+        items.append({"url": url, "title": title, "timestamp": timestamp})
+
     return items
 
 
@@ -126,42 +149,56 @@ def format_retail_version(v, count):
 
 def scrape_latest_maintenance():
     """
-    Scrapes the Lodestone to find the most recent 'All Worlds Maintenance' post
-    and counts occurrences for that specific version to determine hotfix level.
+    Scrapes the Lodestone to find the most recent 'All Worlds Maintenance' post.
     """
-    url = "https://na.finalfantasyxiv.com/lodestone/news/category/2?page=1"
+    # Step 1: News Category
+    url = "https://na.finalfantasyxiv.com/lodestone/news/category/2"
     html = fetch_url(url)
+
+    # Step 2: Fallback to Landing Page (common during 503 maintenance)
+    if not html:
+        url = "https://na.finalfantasyxiv.com/lodestone/"
+        html = fetch_url(url)
+
     if not html:
         return None
 
     news_items = parse_lodestone_news_list(html)
-    maintenance_log = []
 
-    # Identify all relevant maintenance posts on the first page
     for item in news_items:
-        if is_maintenance_post(item["title"]):
-            v = extract_patch_version(fetch_url(item["url"]))
-            if v:
-                item["version"] = v
-                maintenance_log.append(item)
+        title = item["title"]
+        link = item["url"]
 
-    if not maintenance_log:
+        if not is_maintenance_post(title):
+            continue
+
+        detail_html = fetch_url(link)
+        version = extract_patch_version(detail_html)
+
+        if version:
+            # We assume the first (most recent) valid maintenance post
+            # with a patch version is our target.
+            return {"retail_version": version, "title": title, "url": link}
+
+    return None
+
+
+def get_version_info() -> Optional[dict]:
+    """
+    Returns the latest version information by combining Thaliak and Lodestone data.
+    """
+    date_new = fetch_latest_thaliak_patch()
+    maintenance = scrape_latest_maintenance()
+
+    if not maintenance and not date_new:
         return None
 
-    # Assumes hotfixes appear as separate maintenance posts with the same
-    # retail version.
-    counts = {}
-    for item in reversed(maintenance_log):
-        v = item["version"]
-        counts[v] = counts.get(v, 0) + 1
-        item["retail_version"] = format_retail_version(v, counts[v])
-
-    latest = maintenance_log[0]
-    print(
-        f"  Final Scrape Result: {latest['title']} -> {latest['retail_version']}",
-        file=sys.stderr,
-    )
-    return latest
+    return {
+        "retail_version": maintenance["retail_version"] if maintenance else "Unknown",
+        "version_string": date_new,
+        "title": maintenance["title"] if maintenance else "Unknown",
+        "url": maintenance["url"] if maintenance else "Unknown",
+    }
 
 
 def get_patch_context():
