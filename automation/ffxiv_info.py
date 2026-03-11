@@ -131,8 +131,8 @@ def extract_patch_version(html):
     if not html or not (m := re.search(r"patch\s+(\d+\.\d+)", html, re.I)):
         return None
     v = m.group(1)
-    return v + "0" if len(v.split(".")[1]) == 1 else v
-
+    v = v + "0" if len(v.split(".")[1]) == 1 else v
+    return v + "h" if "HotFixes" in html else v
 
 def is_maintenance_post(title):
     """Returns True if the title represents a primary world maintenance post."""
