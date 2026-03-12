@@ -15,13 +15,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Download Latest ffxiv_dx11.exe
-        id: downloader-latest
-        uses: WorkingRobot/ffxiv-downloader@v8
-        with:
-          output-path: latest
-          regex: '^ffxiv_dx11\.exe$'
-
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
@@ -32,6 +25,13 @@ jobs:
         id: versions
         if: steps.downloader-latest.outputs.updated == 'true' || github.event_name == 'workflow_dispatch'
         run: python automation/ffxiv_info.py >> $GITHUB_OUTPUT
+
+      - name: Download Latest ffxiv_dx11.exe
+        id: downloader-latest
+        uses: WorkingRobot/ffxiv-downloader@v8
+        with:
+          output-path: latest
+          regex: '^ffxiv_dx11\.exe$'
 
       - name: Download Previous ffxiv_dx11.exe
         if: steps.versions.outputs.is_new == 'true'
