@@ -79,12 +79,6 @@ def load_versions() -> List[dict]:
     return []
 
 
-def get_latest_version_entry() -> Optional[dict]:
-    """Returns the most recent version entry from the version file."""
-    data = load_versions()
-    return data[-1] if data else None
-
-
 def fetch_latest_thaliak_patch() -> Optional[str]:
     """
     Fetches the latest date-based version string from the Thaliak API.
@@ -131,8 +125,36 @@ def extract_patch_version(html):
     if not html or not (m := re.search(r"patch\s+(\d+\.\d+)", html, re.I)):
         return None
     v = m.group(1)
-    v = v + "0" if len(v.split(".")[1]) == 1 else v
-    return v + "h" if "HotFixes" in html else v
+    if len(v.split(".")[1]) == 1:
+        v += "0"
+    return v
+
+
+def get_next_hotfix_version(base_v, existing_versions):
+    matching = [
+        v["retail_version"]
+        for v in existing_versions
+        if v["retail_version"].startswith(base_v)
+    ]
+    hotfixes = [v for v in matching if "h" in v]
+    if not hotfixes:
+        return f"{base_v}h"
+
+    # Extract numeric suffix: h -> 1, h2 -> 2, etc.
+    nums = [int(h.split("h")[1]) if h.split("h")[1].isdigit() else 1 for h in hotfixes]
+    return f"{base_v}h{max(nums) + 1}"
+
+
+def determine_retail_version(base_v, existing_versions, thaliak_version_new):
+    matching = [v for v in existing_versions if v["retail_version"].startswith(base_v)]
+    latest = matching[-1] if matching else None
+
+    # If we have a record for this base version but the Thaliak version is new, it's a hotfix.
+    if latest and thaliak_version_new and thaliak_version_new != latest["version_string"]:
+        return get_next_hotfix_version(base_v, existing_versions)
+
+    return latest["retail_version"] if latest else base_v
+
 
 def is_maintenance_post(title):
     """Returns True if the title represents a primary world maintenance post."""
@@ -140,14 +162,7 @@ def is_maintenance_post(title):
     return "all worlds" in t and "maintenance" in t and "follow-up" not in t
 
 
-def format_retail_version(v, count):
-    """Formats the version with hotfix suffixes: 7.41, 7.41h, 7.41h2, etc."""
-    if count <= 1:
-        return v
-    return f"{v}h{count - 1 if count > 2 else ''}"
-
-
-def scrape_latest_maintenance():
+def scrape_latest_maintenance(thaliak_version_new=None):
     """
     Scrapes the Lodestone to find the most recent 'All Worlds Maintenance' post.
     """
@@ -164,6 +179,7 @@ def scrape_latest_maintenance():
         return None
 
     news_items = parse_lodestone_news_list(html)
+    existing_versions = load_versions()
 
     for item in news_items:
         title = item["title"]
@@ -173,12 +189,18 @@ def scrape_latest_maintenance():
             continue
 
         detail_html = fetch_url(link)
-        version = extract_patch_version(detail_html)
+        if not detail_html:
+            continue
 
-        if version:
-            # We assume the first (most recent) valid maintenance post
-            # with a patch version is our target.
-            return {"retail_version": version, "title": title, "url": link}
+        base_version = extract_patch_version(detail_html)
+        if not base_version:
+            continue
+
+        retail_version = determine_retail_version(
+            base_version, existing_versions, thaliak_version_new
+        )
+
+        return {"retail_version": retail_version, "title": title, "url": link}
 
     return None
 
@@ -187,15 +209,15 @@ def get_version_info() -> Optional[dict]:
     """
     Returns the latest version information by combining Thaliak and Lodestone data.
     """
-    date_new = fetch_latest_thaliak_patch()
-    maintenance = scrape_latest_maintenance()
+    thaliak_version_new = fetch_latest_thaliak_patch()
+    maintenance = scrape_latest_maintenance(thaliak_version_new=thaliak_version_new)
 
-    if not maintenance and not date_new:
+    if not maintenance and not thaliak_version_new:
         return None
 
     return {
         "retail_version": maintenance["retail_version"] if maintenance else "Unknown",
-        "version_string": date_new,
+        "version_string": thaliak_version_new,
         "title": maintenance["title"] if maintenance else "Unknown",
         "url": maintenance["url"] if maintenance else "Unknown",
     }
@@ -204,27 +226,26 @@ def get_version_info() -> Optional[dict]:
 def get_patch_context():
     """
     Returns a dictionary containing:
-    - retail_prev, date_prev: The latest registered version.
-    - retail_new, date_new: The latest versions found externally.
-    - is_new: True if date_new is not in the registry.
+    - retail_prev, thaliak_version_prev: The latest registered version.
+    - retail_new, thaliak_version_new: The latest versions found externally.
+    - is_new: True if thaliak_version_new is not in the registry.
     """
     versions = load_versions()
     prev = versions[-1] if versions else None
 
-    date_new = fetch_latest_thaliak_patch()
-
-    maintenance = scrape_latest_maintenance()
+    thaliak_version_new = fetch_latest_thaliak_patch()
+    maintenance = scrape_latest_maintenance(thaliak_version_new=thaliak_version_new)
     retail_new = maintenance["retail_version"] if maintenance else None
 
-    is_new = False
-    if date_new:
-        is_new = not any(v["version_string"] == date_new for v in versions)
+    is_new = thaliak_version_new is not None and not any(
+        v["version_string"] == thaliak_version_new for v in versions
+    )
 
     return {
         "retail_prev": prev["retail_version"] if prev else None,
-        "date_prev": prev["version_string"] if prev else None,
+        "thaliak_version_prev": prev["version_string"] if prev else None,
         "retail_new": retail_new,
-        "date_new": date_new,
+        "thaliak_version_new": thaliak_version_new,
         "is_new": is_new,
     }
 
@@ -236,23 +257,26 @@ def update_and_get_info():
     """
     ctx = get_patch_context()
 
-    if ctx["date_prev"]:
-        print(f"date_prev={ctx['date_prev']}")
+    if ctx["thaliak_version_prev"]:
+        print(f"thaliak_version_prev={ctx['thaliak_version_prev']}")
     if ctx["retail_prev"]:
         print(f"retail_prev={ctx['retail_prev']}")
-    if ctx["date_new"]:
-        print(f"date_new={ctx['date_new']}")
+    if ctx["thaliak_version_new"]:
+        print(f"thaliak_version_new={ctx['thaliak_version_new']}")
     if ctx["retail_new"]:
         print(f"retail_new={ctx['retail_new']}")
     print(f"is_new={'true' if ctx['is_new'] else 'false'}")
 
-    if ctx["is_new"] and ctx["date_new"] and ctx["retail_new"]:
+    if ctx["is_new"] and ctx["thaliak_version_new"] and ctx["retail_new"]:
         data = load_versions()
         data.append(
-            {"retail_version": ctx["retail_new"], "version_string": ctx["date_new"]}
+            {
+                "retail_version": ctx["retail_new"],
+                "version_string": ctx["thaliak_version_new"],
+            }
         )
         print(
-            f"Added new version mapping: {ctx['retail_new']} -> {ctx['date_new']}",
+            f"Added new version mapping: {ctx['retail_new']} -> {ctx['thaliak_version_new']}",
             file=sys.stderr,
         )
         with open(VERSIONS_FILE, "w") as f:

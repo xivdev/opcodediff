@@ -37,7 +37,7 @@ jobs:
         if: steps.versions.outputs.is_new == 'true'
         uses: WorkingRobot/ffxiv-downloader@v8
         with:
-          version: ${{ steps.versions.outputs.date_prev }}
+          version: ${{ steps.versions.outputs.thaliak_version_prev }}
           output-path: previous
           regex: '^ffxiv_dx11\.exe$'
 
@@ -78,8 +78,8 @@ jobs:
         uses: peter-evans/create-pull-request@v8
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "Update for ${{ steps.versions.outputs.retail_new }} (${{ steps.versions.outputs.date_new }})"
-          title: "Update for ${{ steps.versions.outputs.retail_new }} (${{ steps.versions.outputs.date_new }})"
+          commit-message: "Update for ${{ steps.versions.outputs.retail_new }} (${{ steps.versions.outputs.thaliak_version_new }})"
+          title: "Update for ${{ steps.versions.outputs.retail_new }} (${{ steps.versions.outputs.thaliak_version_new }})"
           body: |
             This automatic update contains the following changes:
             - Updated `ffxiv_versions_global.json`
