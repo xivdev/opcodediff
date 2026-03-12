@@ -23,11 +23,10 @@ jobs:
 
       - name: Fetch Patch Info and Update Versions
         id: versions
-        if: steps.downloader-latest.outputs.updated == 'true' || github.event_name == 'workflow_dispatch'
         run: python automation/ffxiv_info.py >> $GITHUB_OUTPUT
 
       - name: Download Latest ffxiv_dx11.exe
-        id: downloader-latest
+        if: steps.versions.outputs.is_new == 'true'
         uses: WorkingRobot/ffxiv-downloader@v8
         with:
           output-path: latest
