@@ -135,7 +135,10 @@ def get_packet_handler_opcode_offset(r2, exe_file: str):
     r2.cmd(f"s {opcode_offset_target}")
     r2.cmd("aei; aeim; aeip")  # Initialize ESIL VM, stack, and instruction pointer
 
-    if semver.compare(sem_ver, "7.4.0") >= 0:
+    if semver.compare(sem_ver, "7.5.0") >= 0:
+        offset_reg = "r13"
+        opcode_offset = _get_opcode_offset_post_72(r2, offset_reg)
+    elif semver.compare(sem_ver, "7.4.0") >= 0:
         offset_reg = "r15"
         opcode_offset = _get_opcode_offset_post_72(r2, offset_reg)
     elif semver.compare(sem_ver, "7.3.8") >= 0:
