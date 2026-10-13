@@ -3,6 +3,8 @@ import sys
 import re
 import json
 import urllib.request
+import time
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List
 
 # --- Constants ---
@@ -23,7 +25,7 @@ def fetch_url(url, is_json=False):
     }
     req = urllib.request.Request(url, headers=headers)
     try:
-        with urllib.request.urlopen(req) as response:
+        with urllib.request.urlopen(req, timeout=10) as response:
             content = response.read().decode("utf-8")
             if is_json:
                 return json.loads(content)
@@ -87,6 +89,33 @@ def fetch_latest_thaliak_patch() -> Optional[str]:
     if not data or "patches" not in data or not data["patches"]:
         return None
     return data["patches"][-1]["version_string"]
+
+
+def fetch_latest_game_patch(last_version: str, request_interval=0) -> Optional[str]:
+    """Probes Square Enix's CDN for newer D patches with 0000/0001 build IDs."""
+    day = datetime.now(timezone.utc).date()
+    last_request = 0
+    while True:
+        for build in ("0001", "0000"):
+            version = f"{day:%Y.%m.%d}.{build}.0000"
+            if version <= last_version:
+                return None
+            req = urllib.request.Request(
+                f"http://patch-dl.ffxiv.com/game/{THALIAK_REPO}/D{version}.patch",
+                headers={"User-Agent": "FFXIV PATCH CLIENT"},
+                method="HEAD",
+            )
+            time.sleep(max(0, request_interval - (time.monotonic() - last_request)))
+            last_request = time.monotonic()
+            try:
+                with urllib.request.urlopen(req, timeout=5) as response:
+                    if response.status == 200:
+                        return version
+            except urllib.error.HTTPError as e:
+                if e.code != 404:
+                    raise
+                e.close()
+        day -= timedelta(days=1)
 
 
 # --- Lodestone Scraper ---
@@ -193,6 +222,10 @@ def scrape_latest_maintenance(thaliak_version_new=None):
             continue
 
         base_version = extract_patch_version(detail_html)
+        if not base_version and existing_versions:
+            base_version = extract_patch_version(
+                "Patch " + existing_versions[-1]["retail_version"]
+            )
         if not base_version:
             continue
 
@@ -223,17 +256,22 @@ def get_version_info() -> Optional[dict]:
     }
 
 
-def get_patch_context():
+def get_patch_context(version_string=None):
     """
     Returns a dictionary containing:
     - retail_prev, thaliak_version_prev: The latest registered version.
     - retail_new, thaliak_version_new: The latest versions found externally.
     - is_new: True if thaliak_version_new is not in the registry.
+    An explicit version_string bypasses the Thaliak lookup.
     """
     versions = load_versions()
     prev = versions[-1] if versions else None
 
-    thaliak_version_new = fetch_latest_thaliak_patch()
+    if version_string and not re.fullmatch(
+        r"\d{4}\.\d{2}\.\d{2}\.\d{4}\.\d{4}", version_string
+    ):
+        raise ValueError("Expected a date-based game version")
+    thaliak_version_new = version_string or fetch_latest_thaliak_patch()
     maintenance = scrape_latest_maintenance(thaliak_version_new=thaliak_version_new)
     retail_new = maintenance["retail_version"] if maintenance else None
 
@@ -250,12 +288,12 @@ def get_patch_context():
     }
 
 
-def update_and_get_info():
+def update_and_get_info(version_string=None):
     """
     Discovers current patch context, prints results for GitHub Actions,
     and updates the local registration if a new version is found.
     """
-    ctx = get_patch_context()
+    ctx = get_patch_context(version_string)
 
     if ctx["thaliak_version_prev"]:
         print(f"thaliak_version_prev={ctx['thaliak_version_prev']}")
@@ -284,4 +322,4 @@ def update_and_get_info():
 
 
 if __name__ == "__main__":
-    update_and_get_info()
+    update_and_get_info(sys.argv[1] if len(sys.argv) > 1 else None)

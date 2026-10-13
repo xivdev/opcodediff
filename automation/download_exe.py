@@ -2,8 +2,9 @@
 """
 download_exe.py - Extract ffxiv_dx11.exe from an FFXIV ZiPatch file by streaming.
 
-Does not require a CLUT file. Queries the Thaliak REST API for the patch URL,
-then streams and parses the ZiPatch format to assemble ffxiv_dx11.exe on the fly.
+Does not require a CLUT file. Explicit versions use the official CDN directly;
+the latest-version lookup uses Thaliak. Streams and parses the ZiPatch format
+to assemble ffxiv_dx11.exe on the fly.
 
 Usage:
     python automation/download_exe.py --output latest/
@@ -58,22 +59,18 @@ def _fetch_json(url: str) -> dict:
 
 def get_patch_url(version: Optional[str]) -> tuple[str, str]:
     """Return (version_string, remote_url) for *version* or the latest patch."""
+    if version:
+        patch_id = version if version[:1] in ("D", "H") else "D" + version
+        return (
+            patch_id[1:],
+            f"http://patch-dl.ffxiv.com/game/{THALIAK_REPO}/{patch_id}.patch",
+        )
     data = _fetch_json(THALIAK_API)
     patches = data.get("patches", [])
     if not patches:
         raise RuntimeError("No patches returned from Thaliak API")
 
-    if version is None:
-        return patches[-1]["version_string"], patches[-1]["remote_url"]
-
-    # The version coming from the GHA output may or may not have a D/H prefix.
-    for p in reversed(patches):
-        vs = p["version_string"]
-        bare = vs[1:] if vs[:1] in ("D", "H") else vs
-        if vs == version or bare == version:
-            return vs, p["remote_url"]
-
-    raise RuntimeError(f"Version {version!r} not found in Thaliak patches")
+    return patches[-1]["version_string"], patches[-1]["remote_url"]
 
 
 # ---------------------------------------------------------------------------
@@ -360,7 +357,8 @@ def main() -> None:
         "--version",
         default=None,
         metavar="VERSION",
-        help="Thaliak version string (default: latest). Accepts D/H-prefixed or bare form.",
+        help="Game version to fetch from the official CDN (default: latest via Thaliak). "
+        "Accepts D/H-prefixed or bare form.",
     )
     parser.add_argument(
         "--output",
@@ -378,7 +376,7 @@ def main() -> None:
         os.makedirs(out, exist_ok=True)
         out = os.path.join(out, TARGET_FILE)
 
-    print("Fetching patch metadata from Thaliak...", file=sys.stderr)
+    print("Resolving patch URL...", file=sys.stderr)
     version_str, patch_url = get_patch_url(args.version)
     print(f"  Version : {version_str}", file=sys.stderr)
     print(f"  URL     : {patch_url}", file=sys.stderr)

@@ -2,6 +2,11 @@ name: Minor Patch Diff Workflow
 
 on:
   workflow_dispatch:
+    inputs:
+      game_version:
+        description: 'Game version discovered on the official CDN (optional)'
+        required: false
+        type: string
 
 jobs:
   check-and-diff:
@@ -21,11 +26,13 @@ jobs:
 
       - name: Fetch Patch Info and Update Versions
         id: versions
-        run: python automation/ffxiv_info.py >> $GITHUB_OUTPUT
+        env:
+          GAME_VERSION: ${{ inputs.game_version }}
+        run: python automation/ffxiv_info.py "$GAME_VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Download Latest ffxiv_dx11.exe
         if: steps.versions.outputs.is_new == 'true'
-        run: python automation/download_exe.py --output latest/
+        run: python automation/download_exe.py --version "${{ steps.versions.outputs.thaliak_version_new }}" --output latest/
 
       - name: Download Previous ffxiv_dx11.exe
         if: steps.versions.outputs.is_new == 'true'
